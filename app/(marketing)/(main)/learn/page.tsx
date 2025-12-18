@@ -1,77 +1,137 @@
-// const LearnPage = () => {
-//     return ( 
-//         <div className="di">
-//             Learn Page
-//         </div>
-//      );
-// }
- 
-// export default LearnPage;
+"use client";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input"; // Assure-toi d'avoir ce composant shadcn ou utilise un input standard
+import { Search } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
+import { useState } from "react";
 
-export default function LearnPage() {
+// Données fictives (Simulées)
+const COURSES = [
+  {
+    id: "paludisme",
+    title: "Le Paludisme",
+    description: "Comprendre, prévenir et traiter le paludisme.",
+    image: "/paludisme.png",
+    color: "bg-green-500", // Couleur de la bannière
+    tags: ["Infectieux", "Tropical"],
+  },
+  {
+    id: "diabete",
+    title: "Le Diabète",
+    description: "Gérer la glycémie et vivre avec le diabète.",
+    image: "/diabete.png",
+    color: "bg-blue-500",
+    tags: ["Chronique", "Nutrition"],
+  },
+  {
+    id: "avc",
+    title: "L'AVC",
+    description: "Reconnaître les signes et réagir vite.",
+    image: "/avc.png",
+    color: "bg-red-500",
+    tags: ["Urgence", "Cerveau"],
+  },
+  {
+    id: "cancer-col",
+    title: "Cancer du Col",
+    description: "Prévention, dépistage et traitement.",
+    image: "/cervical_cancer.png",
+    color: "bg-pink-500",
+    tags: ["Cancer", "Femme"],
+  },
+];
+
+export default function LearnDashboardPage() {
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Filtrer les cours selon la recherche
+  const filteredCourses = COURSES.filter((course) =>
+    course.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <div className="flex flex-row-reverse gap-[48px] px-6">
+    <div className="px-6 py-6 flex flex-col gap-y-8 max-w-[900px] mx-auto">
       
-      {/* COLONNE DE DROITE (User progress) - Cachée sur mobile */}
-      <div className="hidden lg:block w-[368px] sticky self-end bottom-6">
-        <div className="min-h-[calc(100vh-48px)] sticky top-6 flex flex-col gap-y-4">
-            <div className="border-2 rounded-xl p-4 flex flex-col gap-y-2">
-                <h3 className="font-bold text-lg text-neutral-700">Mon statut</h3>
-                <div className="flex items-center gap-x-2">
-                    <Image src="/avc.png" height={30} width={30} alt="Points" />
-                    <span className="font-bold text-neutral-600">0 XP</span>
-                </div>
-            </div>
-        </div>
-      </div>
-
-      {/* COLONNE CENTRALE (Leçons) */}
-      <div className="w-full lg:w-[600px] flex flex-col gap-y-12 mb-10">
+      {/* 1. En-tête et Barre de recherche */}
+      <div className="flex flex-col gap-y-4">
+        <h1 className="text-3xl font-extrabold text-neutral-700">
+          Que souhaitez-vous apprendre aujourd'hui ?
+        </h1>
         
-        {/* Entête standard */}
-        <h1 className="text-2xl font-bold text-neutral-700">Apprentissage</h1>
+        <div className="relative w-full max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-neutral-400" />
+          <Input 
+            placeholder="Rechercher un cours (ex: Paludisme)..."
+            className="pl-10 h-12 rounded-xl border-2 border-slate-200 bg-white focus-visible:ring-green-500"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
 
-        {/* UNITÉ 1 : PALUDISME */}
-        <div>
-            {/* Bannière de l'unité */}
-            <div className="bg-green-500 rounded-xl p-5 text-white flex items-center justify-between shadow-sm mb-6">
-                <div className="flex flex-col gap-y-1">
-                    <h3 className="text-xl font-bold">Unité 1</h3>
-                    <p className="text-sm text-green-100">Comprendre le Paludisme</p>
-                </div>
-                <Button variant="secondary" size="lg">Continuer</Button>
-            </div>
-
-            {/* Chemin des leçons (Les ronds) */}
-            <div className="flex flex-col items-center gap-y-4">
-                
-                {/* Leçon 1 */}
-                <div className="relative">
-                    {/* Bulle info au dessus (optionnel) */}
-                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white border-2 px-3 py-2 rounded-xl font-bold text-green-500 animate-bounce">
-                        START
-                        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 border-x-8 border-x-transparent border-t-8 border-t-white" />
-                    </div>
-
-                    <div className="h-[70px] w-[70px] rounded-full bg-green-500 flex items-center justify-center cursor-pointer shadow-[0_4px_0_0_#16a34a] hover:bg-green-400 active:shadow-none active:translate-y-[4px] transition-all">
-                        <Image src="/paludisme.png" height={40} width={40} alt="Lesson" />
-                    </div>
-                </div>
-
-                {/* Leçon 2 (Verrouillée / Grise) */}
-                <div className="pt-8">
-                     <div className="h-[70px] w-[70px] rounded-full bg-gray-200 flex items-center justify-center opacity-80 shadow-[0_4px_0_0_#e5e7eb]">
-                        <Image src="/Minimal_Geometric_Smirk_Face_Icon.png" height={40} width={40} alt="Locked" className="opacity-50 grayscale" />
-                    </div>
-                </div>
-
-            </div>
+        {/* Filtres rapides (Optionnel) */}
+        <div className="flex gap-2 mt-2">
+            <Button variant="outline" size="sm" className="rounded-full text-slate-600">Tout</Button>
+            <Button variant="ghost" size="sm" className="rounded-full text-slate-500">Maladies infectieuses</Button>
+            <Button variant="ghost" size="sm" className="rounded-full text-slate-500">Maladies chroniques</Button>
         </div>
       </div>
 
+      {/* 2. Grille des cartes */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-10">
+        {filteredCourses.map((course) => (
+          <Link href={`/learn/${course.id}`} key={course.id}>
+            <div className="group border-2 border-slate-200 rounded-2xl overflow-hidden cursor-pointer hover:border-slate-300 hover:shadow-md transition-all bg-white flex flex-col h-full">
+              
+              {/* Image / Header de la carte */}
+              <div className={`${course.color} h-[100px] w-full flex items-center justify-center p-4 relative`}>
+                 <div className="bg-white/20 absolute inset-0 group-hover:bg-white/10 transition"/>
+                 <Image 
+                    src={course.image} 
+                    alt={course.title} 
+                    width={60} 
+                    height={60} 
+                    className="object-contain drop-shadow-md transform group-hover:scale-110 transition duration-300"
+                 />
+              </div>
+
+              {/* Contenu de la carte */}
+              <div className="p-5 flex flex-col justify-between flex-1">
+                <div>
+                    <h3 className="font-bold text-xl text-neutral-700 mb-2 group-hover:text-green-600 transition">
+                    {course.title}
+                    </h3>
+                    <p className="text-slate-500 text-sm leading-relaxed">
+                    {course.description}
+                    </p>
+                </div>
+
+                <div className="mt-6 flex items-center justify-between">
+                    {/* Tags */}
+                    <div className="flex gap-1">
+                        {course.tags.slice(0, 1).map(tag => (
+                            <span key={tag} className="text-[10px] uppercase font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-md">
+                                {tag}
+                            </span>
+                        ))}
+                    </div>
+                    <Button size="sm" variant="secondary" className="font-bold">
+                        Commencer
+                    </Button>
+                </div>
+              </div>
+
+            </div>
+          </Link>
+        ))}
+
+        {filteredCourses.length === 0 && (
+            <div className="col-span-full text-center py-10 text-slate-500">
+                Aucun cours trouvé pour "{searchQuery}".
+            </div>
+        )}
+      </div>
     </div>
   );
 }
