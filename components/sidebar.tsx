@@ -77,6 +77,11 @@ export const Sidebar = ({ className }: Props) => {
                     href="/quests"
                     iconSrc="/target.svg" // Remplace par une icône existante
                 />
+                <SidebarItem
+                    label="Mode Expert"
+                    href="/expert"
+                    iconSrc="/file.svg" 
+                />
             </div>
             
             {/* Optionnel : Bouton de déconnexion ou profil en bas */}
