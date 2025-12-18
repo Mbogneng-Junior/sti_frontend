@@ -2,14 +2,10 @@
 
 import { z } from "zod";
 
-// L'URL de base de notre API backend. 
-// Pour le développement, c'est le port 8000.
-// À l'avenir, on pourra le remplacer par une variable d'environnement.
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+// Change l'URL de base pour pointer vers notre proxy d'API interne.
+const API_BASE_URL = "/api/proxy";
 
-// --- Schémas de validation avec Zod (optionnel mais robuste) ---
-// Ceci garantit que les données reçues de l'API ont la forme attendue.
-
+// --- Schémas de validation avec Zod ---
 const DonneesPersonnellesSchema = z.object({
   age: z.number(),
   sexe: z.string(),
@@ -30,7 +26,6 @@ const CasCliniqueSchema = z.object({
 
 const CasesApiResponseSchema = z.array(CasCliniqueSchema);
 
-// Schéma pour la réponse de l'API des filtres
 const FiltersApiResponseSchema = z.object({
     genders: z.array(z.string()),
     professions: z.array(z.string()),
@@ -42,7 +37,7 @@ const FiltersApiResponseSchema = z.object({
 
 /**
  * Récupère une liste de cas cliniques, potentiellement filtrée.
- * @param filters - Un objet contenant les filtres (keyword, min_age, max_age).
+ * @param filters - Un objet contenant les filtres.
  */
 export const getCases = async (filters: { 
     keyword?: string; 
@@ -60,7 +55,7 @@ export const getCases = async (filters: {
     if (filters.profession) params.append("profession", filters.profession);
     if (filters.symptom) params.append("symptom", filters.symptom);
 
-    const response = await fetch(`${API_BASE_URL}/api/cases?${params.toString()}`);
+    const response = await fetch(`${API_BASE_URL}/cases?${params.toString()}`);
     
     if (!response.ok) {
         throw new Error(`Erreur réseau ou serveur: ${response.statusText}`);
@@ -68,7 +63,6 @@ export const getCases = async (filters: {
 
     const data = await response.json();
 
-    // Valider les données reçues avec Zod
     const validatedData = CasesApiResponseSchema.safeParse(data);
     if (!validatedData.success) {
         console.error("Erreur de validation Zod:", validatedData.error);
@@ -82,7 +76,7 @@ export const getCases = async (filters: {
  * Récupère les filtres disponibles depuis l'API.
  */
 export const getFilters = async () => {
-    const response = await fetch(`${API_BASE_URL}/api/filters`);
+    const response = await fetch(`${API_BASE_URL}/filters`);
     if (!response.ok) {
         throw new Error(`Erreur réseau ou serveur: ${response.statusText}`);
     }
@@ -97,10 +91,9 @@ export const getFilters = async () => {
 
 /**
  * Récupère les détails complets d'un cas clinique par son ID.
- * @param id - L'ID unique du cas clinique.
  */
 export const getCaseById = async (id: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/cases/${id}`);
+    const response = await fetch(`${API_BASE_URL}/cases/${id}`);
 
     if (!response.ok) {
         throw new Error(`Erreur réseau ou serveur: ${response.statusText}`);
@@ -108,7 +101,6 @@ export const getCaseById = async (id: string) => {
     
     const data = await response.json();
 
-    // Valider les données
     const validatedData = CasCliniqueSchema.safeParse(data);
     if (!validatedData.success) {
         console.error("Erreur de validation Zod pour getCaseById:", validatedData.error);
@@ -118,4 +110,60 @@ export const getCaseById = async (id: string) => {
     return validatedData.data;
 };
 
-// On pourrait aussi ajouter une fonction pour le mode 'learning' si besoin.
+/**
+ * Déclenche une nouvelle extraction de données depuis la source Fultang.
+ */
+export const forceExtraction = async () => {
+    const response = await fetch(`${API_BASE_URL}/extract/refresh`, {
+        method: 'POST',
+    });
+
+    if (!response.ok) {
+        throw new Error(`Erreur lors du déclenchement de l'extraction: ${response.statusText}`);
+    }
+
+    return await response.json();
+};
+
+
+// --- PLACEHOLDERS POUR LES APIS MANQUANTES ---
+// TODO: Le backend doit implémenter ces endpoints
+
+export const getExpertDashboardData = async () => {
+    console.warn("API non implémentée: getExpertDashboardData");
+    return {
+      kpis: { pendingCases: 12, validatedCases: 45, studentSuccessRate: "68%" },
+      cases: [
+        { id: "cas-001", title: "Fièvre inexpliquée chez un voyageur", date: "2025-12-17T10:00:00Z", aiConfidence: 92 },
+        { id: "cas-002", title: "Douleur abdominale aiguë post-opératoire", date: "2025-12-16T14:30:00Z", aiConfidence: 78 },
+      ]
+    };
+};
+
+export const updateCase = async (caseId: string, data: any) => {
+    console.warn(`API non implémentée: updateCase pour l'ID ${caseId}`, data);
+    return { status: "success", message: "Cas mis à jour (simulation)." };
+};
+
+export const publishCase = async (caseId: string) => {
+    console.warn(`API non implémentée: publishCase pour l'ID ${caseId}`);
+    return { status: "success", message: "Cas publié (simulation)." };
+};
+
+export const rejectCase = async (caseId: string) => {
+    console.warn(`API non implémentée: rejectCase pour l'ID ${caseId}`);
+    return { status: "success", message: "Cas rejeté (simulation)." };
+};
+
+export const getExpertProfile = async () => {
+    console.warn("API non implémentée: getExpertProfile");
+    return {
+        specialty: "Médecine Interne, Maladies Tropicales",
+        bio: "Expert en maladies infectieuses avec 15 ans d'expérience."
+    };
+};
+
+export const updateExpertProfile = async (data: any) => {
+    console.warn("API non implémentée: updateExpertProfile", data);
+    return { status: "success", message: "Profil mis à jour (simulation)." };
+};
