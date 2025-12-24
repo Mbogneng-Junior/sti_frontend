@@ -39,6 +39,13 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
 import { SidebarItem } from "./sidebar-item";
+import { 
+    ClerkLoading, 
+    ClerkLoaded, 
+    UserButton, 
+} from "@clerk/nextjs";
+import { Loader } from "lucide-react";
+
 
 type Props = {
     className?: string;
@@ -75,7 +82,12 @@ export const Sidebar = ({ className }: Props) => {
                 <SidebarItem
                     label="Quêtes"
                     href="/quests"
-                    iconSrc="/target.svg" // Remplace par une icône existante
+                    iconSrc="/target.png" // Remplace par une icône existante
+                />
+                <SidebarItem
+                    label="shop"
+                    href="/shop"
+                    iconSrc="/shop.png" // Remplace par une icône existante
                 />
                 <SidebarItem
                     label="Mode Expert"
@@ -86,6 +98,12 @@ export const Sidebar = ({ className }: Props) => {
             
             {/* Optionnel : Bouton de déconnexion ou profil en bas */}
             <div className="p-4">
+                <ClerkLoading>
+                        <Loader className="h-5 w-5 text-muted-foreground animate-spin " />
+                </ClerkLoading>
+                <ClerkLoaded>
+                    <UserButton afterSignOutUrl="/" />
+                </ClerkLoaded>
             </div>
         </div>
     );
