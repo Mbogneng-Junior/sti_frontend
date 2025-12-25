@@ -38,12 +38,18 @@ export default function LessonChatPage() {
   useEffect(() => {
     const initSession = async () => {
       try {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL;
-        console.log("Mon URL API est :", API_URL); //Pour verifier que tout se passe bien
+         const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/proxy";
+        
+        console.log("Appel via le Proxy :", API_URL);
 
-        // ÉTAPE A : Récupérer un Apprenant (Temporaire pour le test si pas d'auth liée)
-        // Dans le futur, tu utiliseras l'ID de l'utilisateur connecté via Clerk
+        // ATTENTION : Les URLs ci-dessous ne doivent PAS avoir de slash au début si API_URL finit par un slash
+        // Ou on utilise une construction propre.
+        
+        // Ex: /api/proxy/apprenant/apprenants/
         const usersRes = await fetch(`${API_URL}/apprenant/apprenants/`);
+        
+        if (!usersRes.ok) throw new Error("Erreur fetch apprenants: " + usersRes.statusText);
+        
         const users = await usersRes.json();
         
         let apprenantId;
@@ -60,21 +66,35 @@ export default function LessonChatPage() {
             apprenantId = newUser.id;
         }
 
-        // ÉTAPE B : Créer la Session d'apprentissage
-        // On lie l'apprenant au cas clinique (lessonId)
-        const sessionRes = await fetch(`${API_URL}/interface/sessions/`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                apprenant: apprenantId,
-                cas_clinique: casCliniqueId, // L'UUID du cas clinique
-                date_debut: new Date().toISOString()
-            })
-        });
+       console.log("Tentative création session avec :", {
+        apprenant: apprenantId,
+        cas_clinique: casCliniqueId,
+        url: `${API_URL}/interface/sessions/`
+      });
 
-        if (!sessionRes.ok) throw new Error("Impossible de créer la session");
-        const sessionData = await sessionRes.json();
-        setSessionId(sessionData.id);
+      const sessionRes = await fetch(`${API_URL}/interface/sessions/`, {
+        method: "POST",
+        headers: { 
+            "Content-Type": "application/json",
+            // Si ton backend demande un token, il est injecté par le proxy, 
+            // mais assure-toi que l'apprenantId correspond à l'utilisateur connecté
+        },
+        body: JSON.stringify({
+            apprenant: apprenantId,
+            cas_clinique: casCliniqueId, 
+            date_debut: new Date().toISOString()
+        })
+      });
+
+      if (!sessionRes.ok) {
+        // ICI : On lit la réponse pour comprendre l'erreur
+        const errorBody = await sessionRes.text(); 
+        console.error(`Erreur Backend (${sessionRes.status}):`, errorBody);
+        throw new Error(`Erreur ${sessionRes.status}: ${errorBody}`);
+      }
+
+      const sessionData = await sessionRes.json();
+      setSessionId(sessionData.id);
 
         // ÉTAPE C : Charger le contexte du cas clinique (Message initial du tuteur)
         const casRes = await fetch(`${API_URL}/expert/cas-cliniques/${casCliniqueId}/`);
