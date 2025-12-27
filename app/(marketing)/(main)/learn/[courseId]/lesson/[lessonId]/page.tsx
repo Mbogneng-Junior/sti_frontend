@@ -2,310 +2,237 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Send, Stethoscope, User, GraduationCap, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, Stethoscope, User, GraduationCap, Loader2, Sparkles, BarChart, BookOpen, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { toast } from "sonner"; // Optionnel: pour les erreurs, sinon utilise console.error
+import { useAuth } from "@/hooks/useAuth"; // Importe le hook d'authentification
 
+// Importe les fonctions API qui communiquent avec le backend
+import { startSession, analyseResponse, getSessionState } from "@/lib/api";
 
-
-// Types pour nos messages
-type Role = "doctor" | "patient" | "tutor";
-
+// Définition des types pour une meilleure autocomplétion et sécurité du code
+type Role = "doctor" | "patient" | "tutor" | "system";
 interface Message {
-  id: string | number;
-  role: Role;
-  content: string;
+  person: Role;
+  message: string;
+}
+interface StudentProfile {
+  score_global: number;
+  competences: Record<string, number>;
+  feedbacks: { competence: string; points: number; message: string }[];
+  lacunes: any[];
 }
 
+// Sous-composant pour afficher la barre latérale du profil étudiant
+const StudentProfileSidebar = ({ profile }: { profile: StudentProfile | null }) => {
+    if (!profile) {
+        return (
+            <div className="hidden lg:flex flex-col w-[350px] p-4 bg-slate-50 border-l-2 items-center justify-center">
+                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                <p className="text-sm text-slate-500 mt-2">Chargement du profil...</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="hidden lg:flex flex-col w-[350px] p-4 bg-slate-50 border-l-2 overflow-y-auto">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><User className="h-5 w-5 text-primary"/> Profil Étudiant</h3>
+            <div className="space-y-4">
+                <div className="bg-white p-3 rounded-lg border">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">XP Global</p>
+                    <p className="text-2xl font-bold flex items-center gap-2 mt-1">
+                        <Sparkles className="h-5 w-5 text-yellow-500"/> {profile.score_global ?? 0}
+                    </p>
+                </div>
+                
+                <div className="bg-white p-3 rounded-lg border">
+                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2"><BarChart className="h-4 w-4"/> Compétences</h4>
+                    <ul className="space-y-1 text-sm">
+                        {Object.keys(profile.competences || {}).length > 0 ? Object.entries(profile.competences).map(([key, value]) => (
+                            <li key={key} className="flex justify-between items-center">
+                                <span className="capitalize text-slate-600">{key}:</span>
+                                <span className="font-semibold px-2 py-0.5 bg-slate-100 rounded text-slate-800">{value}</span>
+                            </li>
+                        )) : <p className="text-xs text-slate-400 italic">Aucun score pour l'instant.</p>}
+                    </ul>
+                </div>
+                
+                <div className="bg-white p-3 rounded-lg border">
+                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2"><BookOpen className="h-4 w-4"/> Feedbacks Récents</h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                        {(profile.feedbacks || []).slice(-5).reverse().map((fb, i) => (
+                            <div key={i} className="text-xs p-2 bg-slate-100/70 rounded border">
+                                <p className={`font-bold ${fb.points > 0 ? 'text-green-600' : 'text-red-600'}`}>{fb.competence} ({fb.points > 0 ? '+' : ''}{fb.points} pts)</p>
+                                <p className="text-slate-600">{fb.message}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Composant principal de la page de chat
 export default function LessonChatPage() {
-  const params = useParams();
+    const params = useParams();
+    const router = useRouter();
+    const { user, token, isLoading: isAuthLoading, role } = useAuth();
 
-  // On suppose que lessonId correspond à l'UUID du CasClinique dans ton backend
-  const casCliniqueId = params.lessonId as string; 
-  const courseId = params.courseId as string;
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [isLoadingSession, setIsLoadingSession] = useState(true);
-  const router = useRouter();
-  const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isTyping, setIsTyping] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+    const domaineNom = (params.courseId as string).charAt(0).toUpperCase() + (params.courseId as string).slice(1);
+    
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [loadingMessage, setLoadingMessage] = useState("Authentification...");
 
+    const [input, setInput] = useState("");
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
 
-  // 1. INITIALISATION : Créer ou récupérer une session
-  useEffect(() => {
-    const initSession = async () => {
-      try {
-         const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/proxy";
-        
-        console.log("Appel via le Proxy :", API_URL);
+    const bottomRef = useRef<HTMLDivElement>(null);
 
-        // ATTENTION : Les URLs ci-dessous ne doivent PAS avoir de slash au début si API_URL finit par un slash
-        // Ou on utilise une construction propre.
-        
-        // Ex: /api/proxy/apprenant/apprenants/
-        const usersRes = await fetch(`${API_URL}/apprenant/apprenants/`);
-        
-        if (!usersRes.ok) throw new Error("Erreur fetch apprenants: " + usersRes.statusText);
-        
-        const users = await usersRes.json();
-        
-        let apprenantId;
-        if (users.length > 0) {
-            apprenantId = users[0].id;
-        } else {
-            // Créer un utilisateur temporaire si la liste est vide
-            const createRes = await fetch(`${API_URL}/apprenant/apprenants/`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ nom: "Test Student", email: `test${Date.now()}@sti.com` })
-            });
-            const newUser = await createRes.json();
-            apprenantId = newUser.id;
+    // Effet pour initialiser la session
+    useEffect(() => {
+        if (isAuthLoading) return; // Attendre que l'authentification soit vérifiée
+
+        if (!user || !token || role !== 'apprenant') {
+            router.push('/'); // Rediriger si non connecté ou si ce n'est pas un apprenant
+            return;
         }
 
-       console.log("Tentative création session avec :", {
-        apprenant: apprenantId,
-        cas_clinique: casCliniqueId,
-        url: `${API_URL}/interface/sessions/`
-      });
+        const initSession = async () => {
+            try {
+                setLoadingMessage("Démarrage de la session de formation...");
+                const sessionData = await startSession(user.email, domaineNom, token);
+                setSessionId(sessionData.session_id);
 
-      const sessionRes = await fetch(`${API_URL}/interface/sessions/`, {
-        method: "POST",
-        headers: { 
-            "Content-Type": "application/json",
-            // Si ton backend demande un token, il est injecté par le proxy, 
-            // mais assure-toi que l'apprenantId correspond à l'utilisateur connecté
-        },
-        body: JSON.stringify({
-            apprenant: apprenantId,
-            cas_clinique: casCliniqueId, 
-            date_debut: new Date().toISOString()
-        })
-      });
+                setLoadingMessage("Le patient virtuel se prépare...");
+                const state = await getSessionState(sessionData.session_id, token);
+                
+                setMessages(state.chat_history || []);
+                setStudentProfile(state.student_profile || null);
 
-      if (!sessionRes.ok) {
-        // ICI : On lit la réponse pour comprendre l'erreur
-        const errorBody = await sessionRes.text(); 
-        console.error(`Erreur Backend (${sessionRes.status}):`, errorBody);
-        throw new Error(`Erreur ${sessionRes.status}: ${errorBody}`);
-      }
+            } catch (error) {
+                console.error("Erreur d'initialisation de la session:", error);
+                setMessages([{ person: "system", message: `Erreur critique : ${error instanceof Error ? error.message : "Impossible de démarrer la session."}` }]);
+            } finally {
+                setIsLoading(false);
+            }
+        };
 
-      const sessionData = await sessionRes.json();
-      setSessionId(sessionData.id);
+        initSession();
+    }, [isAuthLoading, user, token, role, domaineNom, router]);
 
-        // ÉTAPE C : Charger le contexte du cas clinique (Message initial du tuteur)
-        const casRes = await fetch(`${API_URL}/expert/cas-cliniques/${casCliniqueId}/`);
-        if (casRes.ok) {
-            const casData = await casRes.json();
-            setMessages([
-                {
-                    id: "intro",
-                    role: "tutor",
-                    content: `Bienvenue. Cas : ${casData.titre}. ${casData.historique_medical || "Commencez l'interrogatoire."}`
-                }
-            ]);
+    // Effet pour faire défiler le chat vers le bas
+    useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
+
+    // Fonction pour envoyer un message
+    const handleSend = async () => {
+        if (!input.trim() || isLoading || !sessionId || !token) return;
+
+        const currentInput = input;
+        setInput("");
+        setIsLoading(true);
+        setLoadingMessage("Les agents analysent votre réponse...");
+        
+        try {
+            const response = await analyseResponse(sessionId, currentInput, token);
+            setMessages(response.chat_history || []);
+            setStudentProfile(response.student_profile || null);
+        } catch (error) {
+            console.error("Erreur d'interaction:", error);
+            setMessages((prev) => [...prev, { person: "system", message: `Erreur: ${error instanceof Error ? error.message : "Le serveur n'a pas pu répondre."}` }]);
+        } finally {
+            setIsLoading(false);
         }
-
-      } catch (error) {
-        console.error("Erreur init:", error);
-        // Fallback message si erreur backend
-        setMessages([{ id: "err", role: "tutor", content: "Erreur de connexion au serveur STI. Vérifiez que le Backend tourne."}]);
-      } finally {
-        setIsLoadingSession(false);
-      }
     };
 
-    if (casCliniqueId) {
-        initSession();
+    // Gère l'envoi avec la touche "Entrée"
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter") handleSend();
+    };
+
+    // Affichage d'un loader global pendant la vérification d'auth ou l'init de la session
+    if (isAuthLoading || (isLoading && !sessionId)) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-slate-50">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <p className="text-slate-500 font-medium">{loadingMessage}</p>
+                </div>
+            </div>
+        );
     }
-  }, [casCliniqueId]);
-
-
-
-
-
-
-  // Scroll automatique
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isTyping]);
-
-  // 2. ENVOI DE MESSAGE (Interaction)
-  const handleSend = async () => {
-    if (!input.trim() || !sessionId) return;
-
-    const currentInput = input;
-    setInput(""); // Vider l'input tout de suite
     
-    // Optimistic UI : On affiche le message du médecin tout de suite
-    const tempId = Date.now();
-    setMessages((prev) => [...prev, { id: tempId, role: "doctor", content: currentInput }]);
-    setIsTyping(true);
-
-    try {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
-        // Appel au endpoint /interactions/
-        const res = await fetch(`${API_URL}/interface/interactions/`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                session: sessionId,
-                question_contenu: currentInput,
-                // reponse_contenu sera généré par le backend/IA
-            })
-        });
-
-        if (!res.ok) throw new Error("Erreur lors de l'envoi");
-
-        const data = await res.json();
-
-        // Ajout de la réponse du Patient (simulé par l'IA du backend)
-        if (data.reponse_contenu) {
-            setMessages((prev) => [...prev, {
-                id: `${data.id}-patient`,
-                role: "patient",
-                content: data.reponse_contenu
-            }]);
-        }
-
-        // Ajout du Feedback Tuteur (si existant)
-        if (data.feedback_contenu) {
-            // Petit délai pour simuler la lecture du tuteur
-            setTimeout(() => {
-                setMessages((prev) => [...prev, {
-                    id: `${data.id}-tutor`,
-                    role: "tutor",
-                    content: data.feedback_contenu
-                }]);
-            }, 800);
-        }
-
-    } catch (error) {
-        console.error("Erreur interaction:", error);
-        setMessages((prev) => [...prev, { id: Date.now(), role: "tutor", content: "Erreur: Je n'ai pas pu analyser votre réponse."}]);
-    } finally {
-        setIsTyping(false);
-    }
-  };
-
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") handleSend();
-  };
-
-if (isLoadingSession) {
-  return (
-      <div className="flex h-screen items-center justify-center bg-slate-50">
-          <div className="flex flex-col items-center gap-4">
-              <Loader2 className="h-10 w-10 animate-spin text-green-600" />
-              <p className="text-slate-500 font-medium">Préparation de la salle de consultation...</p>
-          </div>
-      </div>
-  );
-}
-
-  return (
-    <div className="flex flex-col h-[calc(100vh-80px)] max-w-3xl mx-auto bg-slate-50 border-x-2 border-slate-200">
-      
-      {/* HEADER */}
-      <div className="bg-white border-b p-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center gap-x-4">
-            <Link href={`/learn/${courseId}`}>
-                <Button variant="ghost" size="icon">
-                    <ArrowLeft className="h-6 w-6 text-slate-500" />
-                </Button>
-            </Link>
-            <div>
-                <h2 className="font-bold text-lg text-slate-700">Consultation</h2>
-                <div className="text-xs text-green-600 font-medium flex items-center gap-1">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                    </span>
-                    Connecté au STI
-                </div>
-            </div>
-        </div>
-      </div>
-
-      {/* CHAT AREA */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-slate-50">
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex w-full ${
-              msg.role === "doctor" ? "justify-end" : "justify-start"
-            }`}
-          >
-            <div className={`flex max-w-[80%] ${msg.role === "doctor" ? "flex-row-reverse" : "flex-row"} gap-3`}>
-                
-                {/* AVATAR */}
-                <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 shadow-sm border-2
-                    ${msg.role === "doctor" ? "bg-green-100 border-green-200" : 
-                      msg.role === "patient" ? "bg-blue-100 border-blue-200" : "bg-yellow-100 border-yellow-200"
-                    }`}
-                >
-                    {msg.role === "doctor" && <Stethoscope className="h-5 w-5 text-green-600" />}
-                    {msg.role === "patient" && <User className="h-5 w-5 text-blue-600" />}
-                    {msg.role === "tutor" && <GraduationCap className="h-5 w-5 text-yellow-600" />}
+    return (
+        <div className="flex h-full">
+            <div className="flex flex-col flex-1 bg-slate-100">
+                <div className="bg-white border-b p-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+                    <Link href="/learn"><Button variant="ghost" size="icon"><ArrowLeft className="h-6 w-6 text-slate-500" /></Button></Link>
+                    <h2 className="font-bold text-lg text-slate-700">Cas Clinique: {domaineNom}</h2>
+                    <div className="w-10"></div> {/* Espace vide pour centrer le titre */}
                 </div>
 
-                {/* MESSAGE CONTENT */}
-                <div className={`p-4 rounded-2xl shadow-sm text-sm relative
-                    ${msg.role === "doctor" 
-                        ? "bg-green-500 text-white rounded-tr-none" 
-                        : msg.role === "patient" 
-                            ? "bg-white text-slate-700 border border-slate-200 rounded-tl-none" 
-                            : "bg-yellow-50 text-yellow-800 border border-yellow-200 font-medium rounded-tl-none w-full"
-                    }`}
-                >
-                    {msg.role === "tutor" && (
-                        <span className="text-xs font-bold text-yellow-600 block mb-1 uppercase tracking-wider">
-                            Conseil du Tuteur
-                        </span>
+                <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                    {messages.map((msg, index) => (
+                         <div key={index} className={`flex w-full ${ msg.person === "doctor" ? "justify-end" : "justify-start"}`}>
+                            <div className={`flex max-w-[80%] ${msg.person === "doctor" ? "flex-row-reverse" : "flex-row"} gap-3`}>
+                                <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 shadow-sm border-2 ${
+                                    msg.person === "doctor" ? "bg-green-100 border-green-200" :
+                                    msg.person === "patient" ? "bg-blue-100 border-blue-200" :
+                                    msg.person === "tutor" ? "bg-yellow-100 border-yellow-200" : "bg-red-100 border-red-200"
+                                }`}>
+                                    {msg.person === "doctor" && <Stethoscope className="h-5 w-5 text-green-600" />}
+                                    {msg.person === "patient" && <User className="h-5 w-5 text-blue-600" />}
+                                    {msg.person === "tutor" && <GraduationCap className="h-5 w-5 text-yellow-600" />}
+                                    {msg.person === "system" && <AlertCircle className="h-5 w-5 text-red-600" />}
+                                </div>
+                                <div className={`p-4 rounded-2xl shadow-sm text-sm relative ${
+                                    msg.person === "doctor" ? "bg-green-500 text-white rounded-tr-none" :
+                                    msg.person === "patient" ? "bg-white text-slate-700 border border-slate-200 rounded-tl-none" :
+                                    msg.person === "tutor" ? "bg-yellow-50 text-yellow-800 border border-yellow-200 font-medium rounded-tl-none w-full" : "bg-red-50 text-red-800 border border-red-200 rounded-tl-none w-full"
+                                }`}>
+                                    {(msg.person === "tutor" || msg.person === "system") && (
+                                        <span className="text-xs font-bold uppercase tracking-wider block mb-1">
+                                            {msg.person === "tutor" ? "Conseil du Tuteur" : "Message Système"}
+                                        </span>
+                                    )}
+                                    {msg.message}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                    {isLoading && (
+                        <div className="flex justify-center py-4">
+                            <div className="flex items-center gap-2 text-slate-500 bg-white p-2 px-4 rounded-full border shadow-sm">
+                                <Loader2 className="h-4 w-4 animate-spin"/>
+                                <p className="text-sm font-medium">{loadingMessage}</p>
+                            </div>
+                        </div>
                     )}
-                    {msg.content}
+                    <div ref={bottomRef} />
                 </div>
-            </div>
-          </div>
-        ))}
-        
-        {isTyping && (
-             <div className="flex justify-start w-full">
-                <div className="flex items-center gap-2 ml-14 bg-white px-4 py-3 rounded-2xl border border-slate-200">
-                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                </div>
-            </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
 
-      {/* INPUT */}
-      <div className="p-4 bg-white border-t border-slate-200">
-        <div className="flex items-center gap-x-2 max-w-3xl mx-auto">
-            <Input 
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Posez votre question clinique..."
-                className="flex-1 bg-slate-100 border-0 focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-0 text-base py-6 rounded-xl"
-                disabled={isTyping || !sessionId}
-            />
-            <Button 
-                onClick={handleSend} 
-                disabled={!input.trim() || isTyping || !sessionId}
-                className="h-12 w-12 rounded-xl bg-green-500 hover:bg-green-600 text-white shadow-md transition-all"
-            >
-                <Send className="h-5 w-5" />
-            </Button>
+                <div className="p-4 bg-white border-t border-slate-200">
+                    <div className="flex items-center gap-x-2">
+                        <Input
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            placeholder={sessionId ? "Posez votre question au patient..." : "Veuillez patienter, la session charge..."}
+                            disabled={isLoading || !sessionId}
+                            className="flex-1 bg-slate-100 border-0 focus-visible:ring-2 focus-visible:ring-green-500 h-12 rounded-xl"
+                        />
+                        <Button onClick={handleSend} disabled={!input.trim() || isLoading || !sessionId} size="icon" className="h-12 w-12 shrink-0 rounded-xl">
+                            <Send className="h-5 w-5" />
+                        </Button>
+                    </div>
+                </div>
+            </div>
+            <StudentProfileSidebar profile={studentProfile} />
         </div>
-      </div>
-    </div>
-  );
+    );
 }

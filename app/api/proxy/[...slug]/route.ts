@@ -1,38 +1,23 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 
-// On récupère l'URL du backend depuis le .env (défini à l'étape 1)
 const TARGET_API_URL = process.env.PYTHON_API_BASE_URL || "http://localhost:8000/api/v1";
 
 async function proxyRequest(req: NextRequest) {
   try {
-    const { getToken } = await auth(); // await est important dans les versions récentes de Clerk
-    let token: string | null = null;
-
-    if (getToken) {
-      token = await getToken();
+    let path = req.nextUrl.pathname.replace('/api/proxy/', '');
+    
+    if (!/\.[^/]+$/.test(path) && !path.endsWith('/')) {
+        path += '/';
     }
 
-    // 1. Extraire le chemin après /api/proxy/
-    // Ex: si l'URL est /api/proxy/expert/cas-cliniques/, slug sera "expert/cas-cliniques/"
-    const path = req.nextUrl.pathname.replace('/api/proxy/', '');
-    
-    // 2. Construire l'URL cible
-    // Ex: http://104.236.244.230/api/v1/expert/cas-cliniques/?param=1
-    const targetUrl = `${TARGET_API_URL}/${path}${req.nextUrl.search}`;
+    const targetUrl = `${TARGET_API_URL.replace(/\/$/, '')}/${path.replace(/^\//, '')}${req.nextUrl.search}`;
     
     console.log(`[Proxy] Forwarding to: ${targetUrl}`);
 
     const headers = new Headers(req.headers);
-    // On nettoie les headers qui pourraient causer des soucis
     headers.delete('host');
     headers.delete('connection');
     
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`);
-    }
-
-    // Si on a un body (POST/PUT), on doit le lire
     let body = null;
     if (req.method !== 'GET' && req.method !== 'HEAD') {
         const textBody = await req.text();
@@ -43,9 +28,21 @@ async function proxyRequest(req: NextRequest) {
       method: req.method,
       headers: headers,
       body: body,
-      // @ts-ignore - Nécessaire pour certains environnements Node
+      // @ts-expect-error - La propriété 'duplex' est nécessaire pour le streaming.
       duplex: 'half', 
     });
+
+    // --- CORRECTION MAJEURE ET FINALE ---
+    // Si le backend répond "204 No Content", on doit construire une réponse
+    // sans corps (`null`) pour éviter l'erreur TypeError.
+    if (response.status === 204) {
+      console.log("[Proxy] Received 204 No Content from backend, returning empty response.");
+      return new NextResponse(null, {
+          status: 204,
+          statusText: response.statusText,
+      });
+    }
+    // --- FIN DE LA CORRECTION ---
 
     const data = await response.text();
 
@@ -66,5 +63,5 @@ async function proxyRequest(req: NextRequest) {
 export async function GET(req: NextRequest) { return proxyRequest(req); }
 export async function POST(req: NextRequest) { return proxyRequest(req); }
 export async function PUT(req: NextRequest) { return proxyRequest(req); }
-export async function PATCH(req: NextRequest) { return proxyRequest(req); } // Ajouté PATCH au cas où
+export async function PATCH(req: NextRequest) { return proxyRequest(req); }
 export async function DELETE(req: NextRequest) { return proxyRequest(req); }

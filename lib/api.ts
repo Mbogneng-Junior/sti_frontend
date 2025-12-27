@@ -1,169 +1,130 @@
 // lib/api.ts
 
-import { z } from "zod";
-
-// Change l'URL de base pour pointer vers notre proxy d'API interne.
 const API_BASE_URL = "/api/proxy";
 
-// --- Schémas de validation avec Zod ---
-const DonneesPersonnellesSchema = z.object({
-  age: z.number(),
-  sexe: z.string(),
-  profession: z.string().optional().nullable(),
-  etat_civil: z.string().optional().nullable(),
-});
-
-const CasCliniqueSchema = z.object({
-  id_unique: z.string(),
-  hash_authentification: z.string(),
-  motif_consultation: z.string(),
-  donnees_personnelles: DonneesPersonnellesSchema,
-  symptomes: z.array(z.object({ nom: z.string(), degre: z.string().optional().nullable(), duree: z.string().optional().nullable() })),
-  diagnostic_physique: z.array(z.object({ nom: z.string(), resultat: z.string().optional().nullable() })),
-  examens_complementaires: z.array(z.object({ nom: z.string(), resultat: z.string().optional().nullable() })),
-  traitement_en_cours: z.array(z.object({ nom: z.string(), efficacite: z.string().optional().nullable() })),
-});
-
-const CasesApiResponseSchema = z.array(CasCliniqueSchema);
-
-const FiltersApiResponseSchema = z.object({
-    genders: z.array(z.string()),
-    professions: z.array(z.string()),
-    symptoms: z.array(z.string()),
-});
-
-
-// --- Fonctions d'appel à l'API ---
-
 /**
- * Récupère une liste de cas cliniques, potentiellement filtrée.
- * @param filters - Un objet contenant les filtres.
+ * Gère les réponses de l'API de manière robuste, en incluant le cas des réponses 204.
+ * @param response L'objet Response de l'appel fetch.
  */
-export const getCases = async (filters: { 
-    keyword?: string; 
-    min_age?: string; 
-    max_age?: string; 
-    gender?: string;
-    profession?: string;
-    symptom?: string;
-}) => {
-    const params = new URLSearchParams();
-    if (filters.keyword) params.append("keyword", filters.keyword);
-    if (filters.min_age) params.append("min_age", filters.min_age);
-    if (filters.max_age) params.append("max_age", filters.max_age);
-    if (filters.gender) params.append("gender", filters.gender);
-    if (filters.profession) params.append("profession", filters.profession);
-    if (filters.symptom) params.append("symptom", filters.symptom);
+const handleApiResponse = async (response: Response) => {
+    // --- CORRECTION MAJEURE ---
+    // 1. On gère d'abord le cas de succès "204 No Content".
+    // C'est une réponse de succès qui n'a pas de corps, donc on retourne simplement un objet vide.
+    if (response.status === 204) {
+        return {};
+    }
 
-    const response = await fetch(`${API_BASE_URL}/cases?${params.toString()}`);
-    
+    // 2. On gère ensuite tous les cas d'erreur (status 4xx, 5xx).
     if (!response.ok) {
-        throw new Error(`Erreur réseau ou serveur: ${response.statusText}`);
+        let errorMessage = `Erreur API: ${response.status} ${response.statusText}`;
+        try {
+            const errorData = await response.json();
+            if (typeof errorData === 'object' && errorData !== null) {
+                errorMessage = Object.entries(errorData)
+                    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+                    .join('; ');
+            }
+        } catch (e) {
+            // Le corps de l'erreur n'est pas du JSON, on garde le message de base.
+        }
+        throw new Error(errorMessage);
     }
 
-    const data = await response.json();
-
-    const validatedData = CasesApiResponseSchema.safeParse(data);
-    if (!validatedData.success) {
-        console.error("Erreur de validation Zod:", validatedData.error);
-        throw new Error("Les données reçues de l'API sont malformées.");
+    // 3. Enfin, on gère les cas de succès qui ont un corps (200, 201, etc.).
+    try {
+        // On s'assure qu'il y a bien du JSON avant de le parser.
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+            return await response.json();
+        }
+        return {}; // Si pas de JSON, on retourne un objet vide.
+    } catch (e) {
+        console.error("La réponse du serveur était attendue en JSON mais n'a pas pu être parsée.", e);
+        throw new Error("Réponse invalide du serveur.");
     }
-
-    return validatedData.data;
 };
 
-/**
- * Récupère les filtres disponibles depuis l'API.
- */
-export const getFilters = async () => {
-    const response = await fetch(`${API_BASE_URL}/filters`);
-    if (!response.ok) {
-        throw new Error(`Erreur réseau ou serveur: ${response.statusText}`);
-    }
-    const data = await response.json();
-    const validatedData = FiltersApiResponseSchema.safeParse(data);
-    if (!validatedData.success) {
-        console.error("Erreur de validation Zod pour getFilters:", validatedData.error);
-        throw new Error("Les données de filtres reçues de l'API sont malformées.");
-    }
-    return validatedData.data;
-};
 
-/**
- * Récupère les détails complets d'un cas clinique par son ID.
- */
-export const getCaseById = async (id: string) => {
-    const response = await fetch(`${API_BASE_URL}/cases/${id}`);
+// --- AUTHENTIFICATION ---
+// Les fonctions ci-dessous sont maintenant robustes grâce au nouveau handleApiResponse.
 
-    if (!response.ok) {
-        throw new Error(`Erreur réseau ou serveur: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-
-    const validatedData = CasCliniqueSchema.safeParse(data);
-    if (!validatedData.success) {
-        console.error("Erreur de validation Zod pour getCaseById:", validatedData.error);
-        throw new Error("Les données reçues de l'API pour ce cas sont malformées.");
-    }
-    
-    return validatedData.data;
-};
-
-/**
- * Déclenche une nouvelle extraction de données depuis la source Fultang.
- */
-export const forceExtraction = async () => {
-    const response = await fetch(`${API_BASE_URL}/extract/refresh`, {
+export const apprenantRegister = (data: any) => {
+    return fetch(`${API_BASE_URL}/auth/register/`, {
         method: 'POST',
-    });
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    }).then(handleApiResponse);
+};
 
-    if (!response.ok) {
-        throw new Error(`Erreur lors du déclenchement de l'extraction: ${response.statusText}`);
-    }
+export const apprenantLogin = (data: any) => {
+    return fetch(`${API_BASE_URL}/auth/login/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    }).then(handleApiResponse);
+};
 
-    return await response.json();
+export const expertRegister = (data: any) => {
+    return fetch(`${API_BASE_URL}/auth/expert/register/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    }).then(handleApiResponse);
+};
+
+export const expertLogin = (data: any) => {
+    return fetch(`${API_BASE_URL}/auth/expert/login/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    }).then(handleApiResponse);
+};
+
+export const logout = (token: string) => {
+    return fetch(`${API_BASE_URL}/auth/logout/`, {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Token ${token}`,
+        },
+    }).then(handleApiResponse);
 };
 
 
-// --- PLACEHOLDERS POUR LES APIS MANQUANTES ---
-// TODO: Le backend doit implémenter ces endpoints
+// --- SESSION DE TUTEUR ---
 
-export const getExpertDashboardData = async () => {
-    console.warn("API non implémentée: getExpertDashboardData");
-    return {
-      kpis: { pendingCases: 12, validatedCases: 45, studentSuccessRate: "68%" },
-      cases: [
-        { id: "cas-001", title: "Fièvre inexpliquée chez un voyageur", date: "2025-12-17T10:00:00Z", aiConfidence: 92 },
-        { id: "cas-002", title: "Douleur abdominale aiguë post-opératoire", date: "2025-12-16T14:30:00Z", aiConfidence: 78 },
-      ]
-    };
+export const startSession = (email_apprenant: string, domaine_nom: string, token: string) => {
+    return fetch(`${API_BASE_URL}/tuteur/session/start/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Token ${token}`,
+        },
+        body: JSON.stringify({ email_apprenant, domaine_nom }),
+    }).then(handleApiResponse);
 };
 
-export const updateCase = async (caseId: string, data: any) => {
-    console.warn(`API non implémentée: updateCase pour l'ID ${caseId}`, data);
-    return { status: "success", message: "Cas mis à jour (simulation)." };
+export const analyseResponse = (session_id: string, reponse_etudiant: string, token: string) => {
+    return fetch(`${API_BASE_URL}/tuteur/session/analyser/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Token ${token}`,
+        },
+        body: JSON.stringify({ session_id, reponse_etudiant }),
+    }).then(handleApiResponse);
 };
 
-export const publishCase = async (caseId: string) => {
-    console.warn(`API non implémentée: publishCase pour l'ID ${caseId}`);
-    return { status: "success", message: "Cas publié (simulation)." };
+export const getSessionState = (session_id: string, token: string) => {
+    return fetch(`${API_BASE_URL}/tuteur/session/${session_id}/state/`, {
+        headers: { 'Authorization': `Token ${token}` },
+    }).then(handleApiResponse);
 };
 
-export const rejectCase = async (caseId: string) => {
-    console.warn(`API non implémentée: rejectCase pour l'ID ${caseId}`);
-    return { status: "success", message: "Cas rejeté (simulation)." };
-};
 
-export const getExpertProfile = async () => {
-    console.warn("API non implémentée: getExpertProfile");
-    return {
-        specialty: "Médecine Interne, Maladies Tropicales",
-        bio: "Expert en maladies infectieuses avec 15 ans d'expérience."
-    };
-};
+// --- DONNÉES GÉNÉRALES ---
 
-export const updateExpertProfile = async (data: any) => {
-    console.warn("API non implémentée: updateExpertProfile", data);
-    return { status: "success", message: "Profil mis à jour (simulation)." };
+export const getDomaines = async () => {
+    const response = await fetch(`${API_BASE_URL}/expert/domaines/`);
+    return handleApiResponse(response);
 };
