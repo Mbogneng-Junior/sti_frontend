@@ -1,127 +1,182 @@
-// const LearnPage = () => {
-//     return ( 
-//         <div className="di">
-//             Learn Page
-//         </div>
-//      );
-// }
- 
-// export default LearnPage;
+"use client";
 
-
-
-import { Button } from "@/components/ui/button";
-import Image from "next/image";
+import { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
+import { useAuth } from "@/hooks/useAuth";
+import { getSessionsByDomain, startSession, deleteSession } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Loader2, PlusCircle, MessageSquare, Clock, MoreVertical, Trash2, CheckCircle, Activity } from "lucide-react";
+import { toast } from "sonner";
 
-
-// Interface pour les props avec paramètres dynamiques
-interface PageProps {
-  params: Promise<{
-    courseId: string;
-  }>;
-}
-
-// Données des cours (à synchroniser avec votre dashboard)
-const COURSES_DATA: Record<string, { title: string; color: string; image: string }> = {
-  "paludisme": { title: "Paludisme", color: "bg-green-500", image: "/paludisme.png" },
-  "diabete": { title: "Diabète", color: "bg-blue-500", image: "/diabete.png" },
-  "avc": { title: "AVC", color: "bg-red-500", image: "/avc.png" },
-  "cancer-col": { title: "Cancer du Col", color: "bg-pink-500", image: "/cervical_cancer.png" },
+// Structure de données pour les cours (pour l'image)
+const COURSES_DATA: Record<string, { image: string }> = {
+  "paludisme": { image: "/paludisme.png" },
+  "diabète": { image: "/diabete.png" },
+  "avc": { image: "/avc.png" },
+  "cancer du col": { image: "/cervical_cancer.png" },
 };
 
-export default async function LearnPage({ params }: PageProps) {
-  // Dans Next.js 15+, params est une Promise
-  const resolvedParams = await params;
-  const courseId = resolvedParams.courseId;
+// Type pour les données de session enrichies
+interface SessionData {
+    id: string;
+    date_debut: string;
+    date_fin: string | null; // Pour savoir si la session est terminée
+    interaction_count: number;
+    score_session: number;
+    cas_clinique: {
+        titre: string;
+    };
+}
 
-  // Vérifier si le cours existe
-  const courseData = COURSES_DATA[courseId];
-  
-  if (!courseData) {
+export default function CourseSessionsPage() {
+    const router = useRouter();
+    const params = useParams();
+    const { user, token, isLoading: isAuthLoading } = useAuth();
+    
+    const courseId = params.courseId as string;
+    const domaineNom = courseId.charAt(0).toUpperCase() + courseId.slice(1);
+    const courseImage = COURSES_DATA[courseId.toLowerCase()]?.image || "/learn.png";
+
+    const [sessions, setSessions] = useState<SessionData[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isCreating, setIsCreating] = useState(false);
+
+    useEffect(() => {
+        if (isAuthLoading || !user || !token) return;
+        setIsLoading(true);
+        getSessionsByDomain(user.id, domaineNom, token)
+            .then(setSessions)
+            .catch(() => toast.error("Impossible de charger l'historique des sessions."))
+            .finally(() => setIsLoading(false));
+    }, [isAuthLoading, user, token, domaineNom]);
+
+    const handleStartNewSession = async () => {
+        if (!user || !token) return;
+        setIsCreating(true);
+        try {
+            toast.info("Création d'un nouveau cas clinique...");
+            const newSession = await startSession(user.email, domaineNom, token);
+            router.push(`/learn/${courseId}/lesson/${newSession.session_id}`);
+        } catch (error: any) {
+            toast.error(`Erreur: ${error.message}`);
+        } finally {
+            setIsCreating(false);
+        }
+    };
+
+    const handleDeleteSession = async (sessionId: string) => {
+        if (!token) return;
+        try {
+            await deleteSession(sessionId, token);
+            setSessions(prev => prev.filter(s => s.id !== sessionId));
+            toast.success("Session supprimée avec succès.");
+        } catch (error) {
+            toast.error("Erreur lors de la suppression de la session.");
+        }
+    };
+
+    if (isLoading || isAuthLoading) {
+        return (
+            <div className="flex items-center justify-center h-full">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            </div>
+        );
+    }
+
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-neutral-700 mb-2">Cours introuvable</h1>
-          <p className="text-neutral-500 mb-4">Le cours "{courseId}" n'existe pas.</p>
-          <Button asChild>
-            <a href="/learn">Retour aux cours</a>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-row-reverse gap-[48px] px-6">
-      
-      {/* COLONNE DE DROITE (User progress) - Cachée sur mobile */}
-      <div className="hidden lg:block w-[368px] sticky self-end bottom-6">
-        <div className="min-h-[calc(100vh-48px)] sticky top-6 flex flex-col gap-y-4">
-          <div className="border-2 rounded-xl p-4 flex flex-col gap-y-2">
-            <h3 className="font-bold text-lg text-neutral-700">Mon statut</h3>
-            <div className="flex items-center gap-x-2">
-              <Image src={courseData.image} height={30} width={30} alt="Points" />
-              <span className="font-bold text-neutral-600">0 XP</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* COLONNE CENTRALE (Leçons) */}
-      <div className="w-full lg:w-[600px] flex flex-col gap-y-12 mb-10">
-        
-        {/* Entête standard */}
-        <h1 className="text-2xl font-bold text-neutral-700">Apprentissage</h1>
-
-        {/* UNITÉ 1 */}
-        <div>
-          {/* Bannière de l'unité */}
-          <div className={`${courseData.color} rounded-xl p-5 text-white flex items-center justify-between shadow-sm mb-6`}>
-            <div className="flex flex-col gap-y-1">
-              <h3 className="text-xl font-bold">Unité 1</h3>
-              <p className="text-sm opacity-90">Comprendre le {courseData.title}</p>
-            </div>
-            <Button variant="secondary" size="lg">Continuer</Button>
-          </div>
-
-          {/* Chemin des leçons (Les ronds) */}
-          <div className="flex flex-col items-center gap-y-4">
-            
-            {/* Leçon 1 */}
-            <div className="relative">
-              {/* Bulle info au dessus */}
-              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white border-2 px-3 py-2 rounded-xl font-bold text-green-500 animate-bounce">
-                START
-                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 border-x-8 border-x-transparent border-t-8 border-t-white" />
-              </div>
-
-              {/* On enveloppe le cercle dans un Link */}
-              <Link href={`/learn/${courseId}/lesson/1`}> 
-                <div className={`h-[70px] w-[70px] rounded-full ${courseData.color} flex items-center justify-center cursor-pointer shadow-[0_4px_0_0_rgba(0,0,0,0.2)] hover:brightness-110 active:shadow-none active:translate-y-[4px] transition-all`}>
-                  <Image src={courseData.image} height={40} width={40} alt="Lesson" />
+        <div className="max-w-4xl mx-auto px-4 py-8">
+            {/* --- En-tête amélioré --- */}
+            <div className="flex items-center gap-6 mb-8">
+                <div className="bg-white p-3 rounded-2xl border-2 shadow-sm">
+                    <Image src={courseImage} alt={domaineNom} width={60} height={60} />
                 </div>
-              </Link>
+                <div>
+                    <h1 className="text-4xl font-bold text-slate-800 tracking-tight">{domaineNom}</h1>
+                    <p className="text-slate-500 mt-1">Reprenez une conversation ou démarrez un nouveau cas clinique.</p>
+                </div>
             </div>
 
-            {/* Leçon 2 (Verrouillée / Grise) */}
-            <div className="pt-8">
-              <div className="h-[70px] w-[70px] rounded-full bg-gray-200 flex items-center justify-center opacity-80 shadow-[0_4px_0_0_#e5e7eb]">
-                <Image src="/Minimal_Geometric_Smirk_Face_Icon.png" height={40} width={40} alt="Locked" className="opacity-50 grayscale" />
-              </div>
-            </div>
+            {/* --- Bouton d'action principal --- */}
+            <Button onClick={handleStartNewSession} disabled={isCreating} size="lg" className="w-full h-16 text-lg mb-12 gap-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+                {isCreating ? <Loader2 className="h-6 w-6 animate-spin" /> : <PlusCircle className="h-6 w-6" />}
+                {isCreating ? "Génération du cas..." : "Démarrer une Nouvelle Session"}
+            </Button>
 
-            {/* Leçon 3 (Verrouillée) */}
-            <div className="pt-8">
-              <div className="h-[70px] w-[70px] rounded-full bg-gray-200 flex items-center justify-center opacity-80 shadow-[0_4px_0_0_#e5e7eb]">
-                <Image src="/Minimal_Geometric_Smirk_Face_Icon.png" height={40} width={40} alt="Locked" className="opacity-50 grayscale" />
-              </div>
-            </div>
+            {/* --- Section Historique --- */}
+            <div className="space-y-6">
+                <h2 className="text-2xl font-semibold text-neutral-700 border-b-2 pb-3">Historique des Sessions</h2>
 
-          </div>
+                {sessions.length === 0 ? (
+                    <div className="text-center py-16 bg-slate-50 rounded-2xl border-2 border-dashed">
+                        <MessageSquare className="mx-auto h-12 w-12 text-slate-300" />
+                        <h3 className="mt-4 text-lg font-medium text-slate-700">Aucun historique</h3>
+                        <p className="mt-1 text-sm text-slate-500">Votre première session pour ce domaine apparaîtra ici.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {sessions.map((session) => (
+                           <Card key={session.id} className="group transition-shadow duration-300 hover:shadow-lg">
+                               <CardContent className="p-4 flex items-center justify-between gap-4">
+                                    <Link href={`/learn/${courseId}/lesson/${session.id}`} className="flex-1 flex items-center gap-4">
+                                        <div className={`p-3 rounded-lg ${session.date_fin ? 'bg-green-100' : 'bg-blue-100'}`}>
+                                            {session.date_fin ? <CheckCircle className="h-6 w-6 text-green-600"/> : <Activity className="h-6 w-6 text-blue-600"/>}
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-bold text-slate-800 group-hover:text-primary transition-colors">
+                                                {session.cas_clinique?.titre || `Session #${session.id.substring(0, 8)}`}
+                                            </p>
+                                            <div className="flex items-center gap-4 text-xs text-slate-500 mt-1">
+                                                <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" />
+                                                    {new Date(session.date_debut).toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                                <span className="flex items-center gap-1.5"><MessageSquare className="h-3 w-3" />
+                                                    {session.interaction_count} messages
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </Link>
+                                    <AlertDialog>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="shrink-0 text-slate-400 group-hover:text-slate-600">
+                                                    <MoreVertical className="h-5 w-5" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <AlertDialogTrigger asChild>
+                                                    <DropdownMenuItem className="text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer">
+                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                        Supprimer
+                                                    </DropdownMenuItem>
+                                                </AlertDialogTrigger>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    Êtes-vous sûr de vouloir supprimer cette session ? L'historique de la conversation sera perdu définitivement. Cette action est irréversible.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleDeleteSession(session.id)} className="bg-destructive hover:bg-destructive/90">
+                                                    Oui, supprimer
+                                                </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                               </CardContent>
+                           </Card>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
-      </div>
-
-    </div>
-  );
+    );
 }

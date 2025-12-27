@@ -6,12 +6,10 @@ import { ArrowLeft, Send, Stethoscope, User, GraduationCap, Loader2, Sparkles, B
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth"; // Importe le hook d'authentification
+import { useAuth } from "@/hooks/useAuth";
+import { analyseResponse, getSessionState } from "@/lib/api"; 
 
-// Importe les fonctions API qui communiquent avec le backend
-import { startSession, analyseResponse, getSessionState } from "@/lib/api";
-
-// Définition des types pour une meilleure autocomplétion et sécurité du code
+// Types pour les données du backend
 type Role = "doctor" | "patient" | "tutor" | "system";
 interface Message {
   person: Role;
@@ -24,8 +22,10 @@ interface StudentProfile {
   lacunes: any[];
 }
 
-// Sous-composant pour afficher la barre latérale du profil étudiant
+// Sous-composant pour la barre latérale du profil (responsive)
 const StudentProfileSidebar = ({ profile }: { profile: StudentProfile | null }) => {
+    // La classe `hidden lg:flex` est la clé : le composant est caché par défaut,
+    // et ne devient visible (en tant que flex container) qu'à partir du breakpoint 'lg' (grands écrans).
     if (!profile) {
         return (
             <div className="hidden lg:flex flex-col w-[350px] p-4 bg-slate-50 border-l-2 items-center justify-center">
@@ -74,16 +74,19 @@ const StudentProfileSidebar = ({ profile }: { profile: StudentProfile | null }) 
     );
 };
 
+
 // Composant principal de la page de chat
-export default function LessonChatPage() {
+export default function ChatPage() {
     const params = useParams();
     const router = useRouter();
     const { user, token, isLoading: isAuthLoading, role } = useAuth();
 
-    const domaineNom = (params.courseId as string).charAt(0).toUpperCase() + (params.courseId as string).slice(1);
+    const courseId = params.courseId as string;
+    const sessionId = params.sessionId as string;
+    const domaineNom = courseId.charAt(0).toUpperCase() + courseId.slice(1);
     
-    const [sessionId, setSessionId] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
+    const [isSending, setIsSending] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState("Authentification...");
 
     const [input, setInput] = useState("");
@@ -92,71 +95,62 @@ export default function LessonChatPage() {
 
     const bottomRef = useRef<HTMLDivElement>(null);
 
-    // Effet pour initialiser la session
+    // Effet pour charger la session
     useEffect(() => {
-        if (isAuthLoading) return; // Attendre que l'authentification soit vérifiée
-
+        if (isAuthLoading) return;
         if (!user || !token || role !== 'apprenant') {
-            router.push('/'); // Rediriger si non connecté ou si ce n'est pas un apprenant
+            router.push('/');
+            return;
+        }
+        if (!sessionId) {
+            setIsInitialLoading(false);
+            setMessages([{ person: "system", message: "ID de session invalide." }]);
             return;
         }
 
-        const initSession = async () => {
+        const loadSession = async () => {
+            setLoadingMessage("Chargement de la session...");
             try {
-                setLoadingMessage("Démarrage de la session de formation...");
-                const sessionData = await startSession(user.email, domaineNom, token);
-                setSessionId(sessionData.session_id);
-
-                setLoadingMessage("Le patient virtuel se prépare...");
-                const state = await getSessionState(sessionData.session_id, token);
-                
+                const state = await getSessionState(sessionId, token);
                 setMessages(state.chat_history || []);
                 setStudentProfile(state.student_profile || null);
-
             } catch (error) {
-                console.error("Erreur d'initialisation de la session:", error);
-                setMessages([{ person: "system", message: `Erreur critique : ${error instanceof Error ? error.message : "Impossible de démarrer la session."}` }]);
+                setMessages([{ person: "system", message: `Erreur : Impossible de charger la session.` }]);
             } finally {
-                setIsLoading(false);
+                setIsInitialLoading(false);
             }
         };
+        loadSession();
+    }, [isAuthLoading, user, token, role, sessionId, router]);
 
-        initSession();
-    }, [isAuthLoading, user, token, role, domaineNom, router]);
-
-    // Effet pour faire défiler le chat vers le bas
+    // Effet pour le scroll
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
+    }, [messages, isSending]);
 
-    // Fonction pour envoyer un message
+    // Fonction d'envoi de message
     const handleSend = async () => {
-        if (!input.trim() || isLoading || !sessionId || !token) return;
-
+        if (!input.trim() || isSending || !sessionId || !token) return;
         const currentInput = input;
+        setMessages((prev) => [...prev, { person: 'doctor', message: currentInput }]);
         setInput("");
-        setIsLoading(true);
-        setLoadingMessage("Les agents analysent votre réponse...");
-        
+        setIsSending(true);
         try {
             const response = await analyseResponse(sessionId, currentInput, token);
             setMessages(response.chat_history || []);
             setStudentProfile(response.student_profile || null);
         } catch (error) {
-            console.error("Erreur d'interaction:", error);
-            setMessages((prev) => [...prev, { person: "system", message: `Erreur: ${error instanceof Error ? error.message : "Le serveur n'a pas pu répondre."}` }]);
+            setMessages((prev) => [...prev, { person: "system", message: `Erreur: Le serveur n'a pas pu répondre.` }]);
         } finally {
-            setIsLoading(false);
+            setIsSending(false);
         }
     };
 
-    // Gère l'envoi avec la touche "Entrée"
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === "Enter") handleSend();
     };
 
-    // Affichage d'un loader global pendant la vérification d'auth ou l'init de la session
-    if (isAuthLoading || (isLoading && !sessionId)) {
+    if (isAuthLoading || isInitialLoading) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-slate-50">
                 <div className="flex flex-col items-center gap-4">
@@ -170,16 +164,22 @@ export default function LessonChatPage() {
     return (
         <div className="flex h-full">
             <div className="flex flex-col flex-1 bg-slate-100">
-                <div className="bg-white border-b p-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-                    <Link href="/learn"><Button variant="ghost" size="icon"><ArrowLeft className="h-6 w-6 text-slate-500" /></Button></Link>
-                    <h2 className="font-bold text-lg text-slate-700">Cas Clinique: {domaineNom}</h2>
-                    <div className="w-10"></div> {/* Espace vide pour centrer le titre */}
+                <div className="bg-white border-b p-2 sm:p-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+                    <Link href={`/learn/${courseId}`}>
+                        <Button variant="ghost" size="sm" className="lg:size-md">
+                            <ArrowLeft className="h-5 w-5 lg:h-6 lg:w-6 text-slate-500" />
+                        </Button>
+                    </Link>
+                    <h2 className="font-bold text-base sm:text-lg text-slate-700 text-center truncate px-2">
+                        Cas: {domaineNom}
+                    </h2>
+                    <div className="w-9 lg:w-10"></div> {/* Espace pour centrer le titre */}
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                <div className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-6">
                     {messages.map((msg, index) => (
                          <div key={index} className={`flex w-full ${ msg.person === "doctor" ? "justify-end" : "justify-start"}`}>
-                            <div className={`flex max-w-[80%] ${msg.person === "doctor" ? "flex-row-reverse" : "flex-row"} gap-3`}>
+                            <div className={`flex max-w-[90%] sm:max-w-[80%] items-end ${msg.person === "doctor" ? "flex-row-reverse" : "flex-row"} gap-2 sm:gap-3`}>
                                 <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 shadow-sm border-2 ${
                                     msg.person === "doctor" ? "bg-green-100 border-green-200" :
                                     msg.person === "patient" ? "bg-blue-100 border-blue-200" :
@@ -190,7 +190,7 @@ export default function LessonChatPage() {
                                     {msg.person === "tutor" && <GraduationCap className="h-5 w-5 text-yellow-600" />}
                                     {msg.person === "system" && <AlertCircle className="h-5 w-5 text-red-600" />}
                                 </div>
-                                <div className={`p-4 rounded-2xl shadow-sm text-sm relative ${
+                                <div className={`p-3 sm:p-4 rounded-2xl shadow-sm text-sm sm:text-base relative ${
                                     msg.person === "doctor" ? "bg-green-500 text-white rounded-tr-none" :
                                     msg.person === "patient" ? "bg-white text-slate-700 border border-slate-200 rounded-tl-none" :
                                     msg.person === "tutor" ? "bg-yellow-50 text-yellow-800 border border-yellow-200 font-medium rounded-tl-none w-full" : "bg-red-50 text-red-800 border border-red-200 rounded-tl-none w-full"
@@ -200,34 +200,41 @@ export default function LessonChatPage() {
                                             {msg.person === "tutor" ? "Conseil du Tuteur" : "Message Système"}
                                         </span>
                                     )}
-                                    {msg.message}
+                                    <p className="leading-relaxed">{msg.message}</p>
                                 </div>
                             </div>
                         </div>
                     ))}
-                    {isLoading && (
-                        <div className="flex justify-center py-4">
-                            <div className="flex items-center gap-2 text-slate-500 bg-white p-2 px-4 rounded-full border shadow-sm">
-                                <Loader2 className="h-4 w-4 animate-spin"/>
-                                <p className="text-sm font-medium">{loadingMessage}</p>
+                    
+                    {isSending && (
+                         <div className="flex justify-start w-full">
+                            <div className="flex items-end gap-2 sm:gap-3 ml-14">
+                                <div className="h-10 w-10 rounded-full flex items-center justify-center shrink-0 shadow-sm border-2 bg-slate-100 border-slate-200">
+                                    <User className="h-5 w-5 text-slate-500" />
+                                </div>
+                                <div className="flex items-center gap-2 bg-white px-4 py-3 rounded-2xl border border-slate-200">
+                                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
+                                </div>
                             </div>
                         </div>
                     )}
                     <div ref={bottomRef} />
                 </div>
 
-                <div className="p-4 bg-white border-t border-slate-200">
+                <div className="p-2 sm:p-4 bg-white border-t border-slate-200">
                     <div className="flex items-center gap-x-2">
                         <Input
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            placeholder={sessionId ? "Posez votre question au patient..." : "Veuillez patienter, la session charge..."}
-                            disabled={isLoading || !sessionId}
-                            className="flex-1 bg-slate-100 border-0 focus-visible:ring-2 focus-visible:ring-green-500 h-12 rounded-xl"
+                            placeholder={sessionId ? "Posez votre question au patient..." : "Chargement..."}
+                            disabled={isSending || !sessionId}
+                            className="flex-1 bg-slate-100 border-0 focus-visible:ring-2 focus-visible:ring-green-500 h-12 rounded-xl text-sm sm:text-base"
                         />
-                        <Button onClick={handleSend} disabled={!input.trim() || isLoading || !sessionId} size="icon" className="h-12 w-12 shrink-0 rounded-xl">
-                            <Send className="h-5 w-5" />
+                        <Button onClick={handleSend} disabled={!input.trim() || isSending || !sessionId} size="icon" className="h-12 w-12 shrink-0 rounded-xl">
+                            {isSending ? <Loader2 className="h-5 w-5 animate-spin"/> : <Send className="h-5 w-5" />}
                         </Button>
                     </div>
                 </div>
