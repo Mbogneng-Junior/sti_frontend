@@ -3,7 +3,7 @@ import { AuthProvider } from "@/hooks/useAuth"; // Importez le provider que nous
 import { Toaster } from "sonner"; // Composant pour afficher les notifications (ex: "Inscription réussie")
 
 export const metadata = {
-  title: "Tuteur5GI - Apprentissage Médical",
+  title: "FultangMed - Apprentissage Médical",
   description: "Plateforme d'apprentissage médical intelligent.",
 };
 

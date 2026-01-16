@@ -17,16 +17,16 @@ export const Sidebar = ({ className }: Props) => {
 
     return (
         <div className={cn(
-            "flex h-full lg:w-[256px] lg:fixed left-0 top-0 px-4 border-r-2 flex-col bg-white",
+            "flex h-full lg:w-[256px] lg:fixed left-0 top-0 px-4 flex-col bg-white shadow-[2px_0_15px_rgb(0,0,0,0.06)]",
             className,
         )}>
-            <Link href={role === 'expert' ? '/expert/dashboard' : '/learn'}>
-                <div className="pt-8 pl-4 pb-7 flex items-center gap-x-3">
-                    <Image src="/Minimal_Geometric_Smirk_Face_Icon.png" height={40} width={40} alt="Mascot" />
-                    <h1 className="text-2xl font-extrabold text-green-600 tracking-wide">
-                        Tuteur5GI
-                    </h1>
+            <Link href={role === 'expert' ? '/expert/dashboard' : '/learn'} className="pt-8 pl-4 pb-7 flex items-center gap-x-3 hover:opacity-80 transition-opacity">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <Image src="/Minimal_Geometric_Smirk_Face_Icon.png" height={24} width={24} alt="FultangMed" className="brightness-0 invert" />
                 </div>
+                <h1 className="text-2xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent tracking-tight">
+                    FultangMed
+                </h1>
             </Link>
 
             <div className="flex flex-col gap-y-2 flex-1">

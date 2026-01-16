@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -44,7 +43,7 @@ export default function MarketingPage() {
             setIsLoading(true);
             getDomaines()
                 .then(setDomaines)
-                .catch(err => setError("Impossible de charger les domaines."))
+                .catch(() => setError("Impossible de charger les domaines."))
                 .finally(() => setIsLoading(false));
         }
     }, [userRole, authMode, domaines.length]);
@@ -69,8 +68,8 @@ export default function MarketingPage() {
                 toast.success("Inscription réussie !", { description: "Vous pouvez maintenant vous connecter." });
                 setAuthMode('login'); // Basculer vers le formulaire de connexion
             }
-        } catch (err: any) {
-            setError(err.message || "Une erreur est survenue.");
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Une erreur est survenue.");
         } finally {
             setIsLoading(false);
         }
@@ -90,65 +89,148 @@ export default function MarketingPage() {
     if (user) return null;
 
     return (
-        <div className="max-w-[988px] mx-auto flex-1 w-full flex flex-col lg:flex-row items-center justify-center p-4 gap-12">
-            <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
-                <div className="relative w-60 h-60 lg:w-[424px] lg:h-[424px] mb-8 lg:mb-0">
-                    <Image src="/Mobile_Game_Character_Spritesheet.png" fill alt="Hero" className="object-contain" />
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-6">
+            <div className="max-w-6xl w-full flex flex-col lg:flex-row items-center justify-between gap-16">
+                {/* Left Side - Hero Section */}
+                <div className="flex-1 flex flex-col items-center text-center lg:items-start lg:text-left space-y-6">
+                    <div className="relative w-72 h-72 lg:w-96 lg:h-96">
+                        <Image src="/Mobile_Game_Character_Spritesheet.png" fill alt="Hero" className="object-contain drop-shadow-2xl" />
+                    </div>
+                    <div className="space-y-4">
+                        <h1 className="text-3xl lg:text-5xl font-extrabold text-gray-900 leading-tight">
+                            Apprenez, pratiquez et maîtrisez les sciences médicales
+                        </h1>
+                        <p className="text-lg text-gray-600 max-w-xl">
+                            Avec <span className="font-bold text-blue-600">FultangMed</span>, développez vos compétences médicales grâce à l&apos;intelligence artificielle
+                        </p>
+                    </div>
                 </div>
-                <h1 className="text-xl lg:text-3xl font-bold text-neutral-600 max-w-[480px]">
-                    Apprenez, pratiquez et maîtrisez les sciences médicales avec Tuteur5GI
-                </h1>
-            </div>
 
-            <div className="w-full max-w-md p-6 border rounded-2xl shadow-lg bg-white">
-                <div className="grid grid-cols-2 gap-2 mb-6">
-                    <Button onClick={() => toggleRole('apprenant')} variant={userRole === 'apprenant' ? 'secondary' : 'outline'}>Je suis Apprenant</Button>
-                    <Button onClick={() => toggleRole('expert')} variant={userRole === 'expert' ? 'primary' : 'outline'}>Je suis Expert</Button>
-                </div>
-                <h2 className="text-2xl font-bold text-center mb-4">{authMode === 'login' ? 'Connexion' : 'Inscription'}</h2>
-                {error && <p className="bg-red-100 text-red-700 p-2 rounded-md text-sm text-center mb-4">{error}</p>}
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    {authMode === 'register' && (
-                        <div>
-                            <Label htmlFor="nom">Nom Complet</Label>
-                            <Input id="nom" value={nom} onChange={e => setNom(e.target.value)} required disabled={isLoading} />
+                {/* Right Side - Auth Form */}
+                <div className="w-full max-w-md">
+                    <div className="bg-white rounded-3xl shadow-[0_20px_60px_rgb(0,0,0,0.12)] p-8">
+                        {/* Role Selector */}
+                        <div className="flex gap-3 mb-8">
+                            <button
+                                onClick={() => toggleRole('apprenant')}
+                                className={`flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all ${
+                                    userRole === 'apprenant'
+                                        ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                            >
+                                Je suis Apprenant
+                            </button>
+                            <button
+                                onClick={() => toggleRole('expert')}
+                                className={`flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all ${
+                                    userRole === 'expert'
+                                        ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                            >
+                                Je suis Expert
+                            </button>
                         </div>
-                    )}
-                    <div>
-                        <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required disabled={isLoading} />
-                    </div>
-                    <div>
-                        <Label htmlFor="password">Mot de passe</Label>
-                        <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required disabled={isLoading} />
-                    </div>
-                    {userRole === 'expert' && authMode === 'register' && (
-                        <>
+                        {/* Title */}
+                        <h2 className="text-3xl font-bold text-gray-900 text-center mb-6">
+                            {authMode === 'login' ? 'Connexion' : 'Inscription'}
+                        </h2>
+                        
+                        {/* Error Message */}
+                        {error && (
+                            <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg text-sm mb-6">
+                                {error}
+                            </div>
+                        )}
+                        {/* Form */}
+                        <form onSubmit={handleSubmit} className="space-y-5">
+                            {authMode === 'register' && (
+                                <div>
+                                    <Label htmlFor="nom" className="text-sm font-semibold text-gray-700 mb-2 block">Nom Complet</Label>
+                                    <Input 
+                                        id="nom" 
+                                        value={nom} 
+                                        onChange={e => setNom(e.target.value)} 
+                                        required 
+                                        disabled={isLoading}
+                                        className="h-12 rounded-xl border-0 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 transition-all"
+                                    />
+                                </div>
+                            )}
                             <div>
-                                <Label htmlFor="matricule">Matricule Professionnel</Label>
-                                <Input id="matricule" value={matricule} onChange={e => setMatricule(e.target.value)} required disabled={isLoading} />
+                                <Label htmlFor="email" className="text-sm font-semibold text-gray-700 mb-2 block">Email</Label>
+                                <Input 
+                                    id="email" 
+                                    type="email" 
+                                    value={email} 
+                                    onChange={e => setEmail(e.target.value)} 
+                                    required 
+                                    disabled={isLoading}
+                                    className="h-12 rounded-xl border-0 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 transition-all"
+                                />
                             </div>
                             <div>
-                                <Label htmlFor="domaine">Domaine d'Expertise</Label>
-                                <Select onValueChange={setDomaineId} required disabled={isLoading}>
-                                    <SelectTrigger><SelectValue placeholder="Sélectionnez votre domaine" /></SelectTrigger>
-                                    <SelectContent>
-                                        {domaines.map(d => <SelectItem key={d.id} value={d.id}>{d.nom}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
+                                <Label htmlFor="password" className="text-sm font-semibold text-gray-700 mb-2 block">Mot de passe</Label>
+                                <Input 
+                                    id="password" 
+                                    type="password" 
+                                    value={password} 
+                                    onChange={e => setPassword(e.target.value)} 
+                                    required 
+                                    disabled={isLoading}
+                                    className="h-12 rounded-xl border-0 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 transition-all"
+                                />
                             </div>
-                        </>
-                    )}
-                    <Button type="submit" className="w-full" disabled={isLoading}>
-                        {isLoading ? <Loader2 className="animate-spin" /> : (authMode === 'login' ? 'Se Connecter' : 'S\'inscrire')}
-                    </Button>
-                </form>
-                <p className="text-center text-sm mt-4">
-                    {authMode === 'login' ? "Pas encore de compte ?" : "Déjà un compte ?"}
-                    <button onClick={() => toggleMode(authMode === 'login' ? 'register' : 'login')} className="font-semibold text-primary hover:underline ml-1">
-                        {authMode === 'login' ? 'Inscrivez-vous' : 'Connectez-vous'}
-                    </button>
-                </p>
+                            {userRole === 'expert' && authMode === 'register' && (
+                                <>
+                                    <div>
+                                        <Label htmlFor="matricule" className="text-sm font-semibold text-gray-700 mb-2 block">Matricule Professionnel</Label>
+                                        <Input 
+                                            id="matricule" 
+                                            value={matricule} 
+                                            onChange={e => setMatricule(e.target.value)} 
+                                            required 
+                                            disabled={isLoading}
+                                            className="h-12 rounded-xl border-0 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 transition-all"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="domaine" className="text-sm font-semibold text-gray-700 mb-2 block">Domaine d&apos;Expertise</Label>
+                                        <Select onValueChange={setDomaineId} required disabled={isLoading}>
+                                            <SelectTrigger className="h-12 rounded-xl"><SelectValue placeholder="Sélectionnez votre domaine" /></SelectTrigger>
+                                            <SelectContent>
+                                                {domaines.map(d => <SelectItem key={d.id} value={d.id}>{d.nom}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </>
+                            )}
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="w-full h-12 rounded-xl font-semibold text-white transition-all mt-6 bg-gradient-to-r from-blue-500 to-indigo-500 hover:shadow-lg hover:shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isLoading ? (
+                                    <Loader2 className="animate-spin mx-auto" size={20} />
+                                ) : (
+                                    authMode === 'login' ? 'Se Connecter' : 'S\'inscrire'
+                                )}
+                            </button>
+                        </form>
+                        
+                        {/* Toggle Auth Mode */}
+                        <p className="text-center text-sm text-gray-600 mt-6">
+                            {authMode === 'login' ? "Pas encore de compte ?" : "Déjà un compte ?"}
+                            <button 
+                                onClick={() => toggleMode(authMode === 'login' ? 'register' : 'login')} 
+                                className="font-semibold text-blue-600 hover:text-blue-700 ml-1 transition-colors"
+                            >
+                                {authMode === 'login' ? 'Inscrivez-vous' : 'Connectez-vous'}
+                            </button>
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
     );

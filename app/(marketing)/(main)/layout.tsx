@@ -1,5 +1,8 @@
+"use client";
+
 import { MobileHeader } from "@/components/mobile-header";
 import { Sidebar } from "@/components/sidebar";
+import { usePathname } from "next/navigation";
 
 type Props = {
     children: React.ReactNode;
@@ -9,6 +12,14 @@ type Props = {
 const MainLayout = ({ 
     children 
 }: Props) => {
+    const pathname = usePathname();
+    const isExpertRoute = pathname?.startsWith('/expert');
+
+    // Pour les routes expert, on ne rend que les children (pas de sidebar Tuteur5GI)
+    if (isExpertRoute) {
+        return <>{children}</>;
+    }
+
     return ( 
         <>
             <MobileHeader />

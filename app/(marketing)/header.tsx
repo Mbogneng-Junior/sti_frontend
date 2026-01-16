@@ -12,17 +12,19 @@ export const Header = () => {
     const { user, logout, isLoading } = useAuth();
 
     return ( 
-        <header className="h-20 w-full border-b-2 border-slate-200 px-4 bg-white">
-            <div className="lg:max-w-5xl mx-auto flex items-center justify-between h-full">
-                {/* Section Logo (inchangée) */}
-                <div className="pt-8 pl-4 pb-7 flex items-center gap-x-3">
-                    <Image src="/Minimal_Geometric_Smirk_Face_Icon.png" height={40} width={40} alt="Mascot"/>
-                    <h1 className="text-2xl font-extrabold text-green-600 tracking-wide">
-                        Tuteur5GI
+        <header className="h-20 w-full bg-white shadow-[0_1px_3px_rgb(0,0,0,0.06)] px-6">
+            <div className="lg:max-w-7xl mx-auto flex items-center justify-between h-full">
+                {/* Section Logo */}
+                <Link href="/" className="flex items-center gap-x-3 hover:opacity-80 transition-opacity">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                        <Image src="/Minimal_Geometric_Smirk_Face_Icon.png" height={24} width={24} alt="FultangMed" className="brightness-0 invert"/>
+                    </div>
+                    <h1 className="text-2xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent tracking-tight">
+                        FultangMed
                     </h1>
-                </div>
+                </Link>
 
-                {/* Section Authentification (entièrement remplacée) */}
+                {/* Section Authentification */}
                 <div className="flex items-center gap-x-4">
                     {isLoading && (
                         <Loader className="h-5 w-5 text-muted-foreground animate-spin" />
@@ -47,11 +49,11 @@ export const Header = () => {
                                 </div>
                             ) : (
                                 // Si l'utilisateur n'est pas connecté
-                                <Button size="lg" variant="ghost" asChild>
-                                    <Link href="/">
-                                        Login
-                                    </Link>
-                                </Button>
+                                <Link href="/">
+                                    <button className="px-6 py-2.5 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:shadow-lg hover:shadow-blue-500/30 transition-all">
+                                        Connexion
+                                    </button>
+                                </Link>
                             )}
                         </>
                     )}

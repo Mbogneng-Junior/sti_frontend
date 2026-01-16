@@ -123,30 +123,119 @@ export const getDomaines = async () => fetch(`${API_BASE_URL}/expert/domaines/`)
 // --- FONCTIONS "MODE EXPERT" (CORRIGÉES AVEC LES TYPES POUR ÉVITER LES ERREURS DE BUILD) ---
 
 
-
 export const forceExtraction = async () => {
     console.warn("API non implémentée: forceExtraction. Simule un succès.");
     return { status: "success", message: "Extraction simulée lancée." };
 };
 
+// Type pour le statut d'un cas clinique
+export type CaseStatus = "attente" | "validé" | "rejeté";
+
+// Type pour un cas clinique dans le dashboard expert
+export type ExpertCaseData = {
+    id: string;
+    patientAge: number;
+    gender: "Male" | "Female";
+    domain: string;
+    extractionDate: string;
+    status: CaseStatus;
+};
+
 // Type pour les données du dashboard
-type DashboardData = {
-    kpis: { pendingCases: number; validatedCases: number; studentSuccessRate: string; };
-    cases: { id: string; title: string; date: string; aiConfidence: number; }[];
+export type DashboardData = {
+    kpis: { 
+        totalCases: number; 
+        pendingCases: number; 
+        validatedCases: number;
+        trendTotal?: { value: number; period: string; };
+        trendPending?: { value: number; period: string; };
+        trendValidated?: { value: number; period: string; };
+    };
+    cases: ExpertCaseData[];
 };
 
 export const getExpertDashboardData = async (): Promise<DashboardData> => {
     console.warn("API non implémentée: getExpertDashboardData. Retour de données simulées.");
-    // CORRECTION : On retourne un objet typé avec un tableau vide.
+    
+    // Données simulées réalistes
     return {
-      kpis: { pendingCases: 0, validatedCases: 0, studentSuccessRate: "N/A" },
-      cases: [],
+      kpis: { 
+        totalCases: 1248,
+        pendingCases: 42, 
+        validatedCases: 1150,
+        trendTotal: { value: 12, period: "depuis le mois dernier" },
+        trendPending: { value: 8, period: "cette semaine" },
+        trendValidated: { value: 8, period: "cette semaine" },
+      },
+      cases: [
+        {
+          id: "CASE-8842",
+          patientAge: 45,
+          gender: "Male",
+          domain: "Cardiologie",
+          extractionDate: "2023-10-24",
+          status: "attente"
+        },
+        {
+          id: "CASE-9120",
+          patientAge: 62,
+          gender: "Female",
+          domain: "Neurologie",
+          extractionDate: "2023-10-23",
+          status: "attente"
+        },
+        {
+          id: "CASE-7751",
+          patientAge: 28,
+          gender: "Female",
+          domain: "Dermatologie",
+          extractionDate: "2023-10-22",
+          status: "validé"
+        },
+        {
+          id: "CASE-7554",
+          patientAge: 55,
+          gender: "Male",
+          domain: "Cardiologie",
+          extractionDate: "2023-10-20",
+          status: "validé"
+        },
+        {
+          id: "CASE-6001",
+          patientAge: 19,
+          gender: "Male",
+          domain: "Pédiatrie",
+          extractionDate: "2023-10-19",
+          status: "rejeté"
+        },
+        {
+          id: "CASE-9331",
+          patientAge: 33,
+          gender: "Female",
+          domain: "Oncologie",
+          extractionDate: "2023-10-18",
+          status: "attente"
+        },
+        {
+          id: "CASE-4122",
+          patientAge: 71,
+          gender: "Male",
+          domain: "Gériatrie",
+          extractionDate: "2023-10-18",
+          status: "validé"
+        },
+      ],
     };
 };
 
 export const updateCase = async (caseId: string, data: any) => {
     console.warn(`API non implémentée: updateCase pour ${caseId}.`);
     return { status: "success", message: "Cas mis à jour (simulation)." };
+};
+
+export const validateCase = async (caseId: string) => {
+    console.warn(`API non implémentée: validateCase pour ${caseId}.`);
+    return { status: "success", message: "Cas validé avec succès." };
 };
 
 export const publishCase = async (caseId: string) => {
@@ -156,7 +245,79 @@ export const publishCase = async (caseId: string) => {
 
 export const rejectCase = async (caseId: string) => {
     console.warn(`API non implémentée: rejectCase pour ${caseId}.`);
-    return { status: "success", message: "Cas rejeté (simulation)." };
+    return { status: "success", message: "Cas rejeté avec succès." };
+};
+
+// Type pour les détails complets d'un cas clinique pour la page de révision
+export type CaseReviewData = {
+    id: string;
+    title: string;
+    status: CaseStatus;
+    createdDate: string;
+    patientInfo: {
+        gender: "Male" | "Female";
+        age: number;
+        bmi: number;
+        patientId: string;
+    };
+    patientHistory: string;
+    pastMedicalHistory: string[];
+    laboratoryResults: {
+        testName: string;
+        result: string;
+        referenceRange: string;
+        status: "High" | "Normal" | "Elevated";
+    }[];
+};
+
+export const getCaseForReview = async (caseId: string): Promise<CaseReviewData> => {
+    console.warn(`API non implémentée: getCaseForReview pour ${caseId}.`);
+    
+    // Données simulées basées sur la capture d'écran
+    return {
+        id: caseId,
+        title: "Infarctus du myocarde aigu",
+        status: "attente",
+        createdDate: "2023-10-24",
+        patientInfo: {
+            gender: "Male",
+            age: 64,
+            bmi: 28.4,
+            patientId: "#48291"
+        },
+        patientHistory: "Le patient s'est présenté au service des urgences avec une douleur thoracique sévère et écrasante irradiant vers le bras gauche et la mâchoire. La douleur a commencé il y a environ 45 minutes avant l'arrivée alors que le patient jardinait. Il décrit la douleur comme 9/10 en gravité.\n\nLes symptômes associés incluent la diaphorèse, l'essoufflement et les nausées. Il nie tout traumatisme récent, fièvre ou épisode similaire dans le passé, bien qu'il note une \"indigestion occasionnelle\" avec effort au cours du dernier mois.",
+        pastMedicalHistory: [
+            "Hypertension (diagnostiquée en 2015)",
+            "Diabète de type 2 (non contrôlé)",
+            "Ancien fumeur (il y a 10 ans)"
+        ],
+        laboratoryResults: [
+            {
+                testName: "Troponine T",
+                result: "0.8 ng/mL",
+                referenceRange: "< 0.01 ng/mL",
+                status: "High"
+            },
+            {
+                testName: "CK-MB",
+                result: "32 ng/mL",
+                referenceRange: "0 - 5 ng/mL",
+                status: "High"
+            },
+            {
+                testName: "Numération des GB",
+                result: "11.5 K/µL",
+                referenceRange: "4.5 - 11.0 K/µL",
+                status: "Elevated"
+            },
+            {
+                testName: "Hémoglobine",
+                result: "14.2 g/dL",
+                referenceRange: "13.5 - 17.5 g/dL",
+                status: "Normal"
+            }
+        ]
+    };
 };
 
 export const getExpertProfile = async () => {
