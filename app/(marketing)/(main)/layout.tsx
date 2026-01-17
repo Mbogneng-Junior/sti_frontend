@@ -1,15 +1,38 @@
+"use client";
+
 import { MobileHeader } from "@/components/mobile-header";
 import { Sidebar } from "@/components/sidebar";
+import { usePathname } from "next/navigation";
 
 type Props = {
     children: React.ReactNode;
 };
 
 
-const MainLayout = ({ 
-    children 
+const MainLayout = ({
+    children
 }: Props) => {
-    return ( 
+    const pathname = usePathname();
+    const isExpertRoute = pathname?.startsWith('/expert');
+    const isLearnRoute = pathname?.startsWith('/learn');
+    const isProfilingRoute = pathname?.startsWith('/profiling');
+
+    // Pour les routes expert, on ne rend que les children (pas de sidebar Tuteur5GI)
+    if (isExpertRoute) {
+        return <>{children}</>;
+    }
+
+    // Pour les routes profiling, on ne rend que les children (page autonome)
+    if (isProfilingRoute) {
+        return <>{children}</>;
+    }
+
+    // Pour les routes learn, on ne rend que les children (LearnLayout gère la sidebar)
+    if (isLearnRoute) {
+        return <>{children}</>;
+    }
+
+    return (
         <>
             <MobileHeader />
             <Sidebar className="hidden lg:flex" />
@@ -17,7 +40,7 @@ const MainLayout = ({
                 <div className="max-w-[1056px] mx-auto pt-6 h-full">
                 { children}
                 </div>
-            </main>           
+            </main>
         </>
     );
 };

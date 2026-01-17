@@ -5,38 +5,38 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "bg-white text-black border-slate-200 border-2 border-b-4 active:border-b-2 hover:bg-slate-100 text-slate-500 rounded-xl",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow hover:bg-primary/90",
+          "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40",
         destructive:
-          "bg-green-500 text-destructive-foreground shadow-sm hover:bg-destructive/90",
+          "bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40",
         primary: 
-          "bg-sky-400 text-primary-foreground hover:bg-sky-400/90 border-sky-500 border-b-4 active:border-b-0",
+          "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40",
         primaryOutline:
-          "bg-white text-sky-500 hover:bg-slate-100",
+          "bg-white text-blue-600 border border-blue-200 hover:bg-blue-50 shadow-sm",
         secondary: 
-          "bg-green-500 text-white font-semibold flex items-center justify-center hover:bg-green-500/90 border-green-600 border-b-4 active:border-b-0",
+          "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40",
         secondaryOutline:
-          "bg-white text-green-500 hover:bg-slate-100",
+          "bg-white text-blue-600 border border-blue-200 hover:bg-blue-50 shadow-sm",
         danger: 
-          "bg-rose-500 text-primary-foreground hover:bg-rose-500/90 border-rose-600 border-b-4 active:border-b-0",
+          "bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40",
         dangerOutline:
-          "bg-white text-rose-500 hover:bg-slate-100",
+          "bg-white text-red-600 border border-red-200 hover:bg-red-50 shadow-sm",
         super: 
-          "bg-indigo-500 text-primary-foreground hover:bg-indigo-500/90 border-indigo-600 border-b-4 active:border-b-0",
+          "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40",
         superOutline:
-          "bg-white text-indigo-500 hover:bg-slate-100",
+          "bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50 shadow-sm",
         outline:
-          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
+          "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 shadow-sm",
         ghost: 
-          "bg-transparent test-slate-500 border-transparent border-0 hover:bg-slate-100",
+          "bg-transparent text-gray-600 hover:bg-gray-100",
         Sidebar: 
-          "bg-transparent text-slate-500 border-2 border-transparent hover:bg-slate-100 transition-none",
-        SidebarOutline: "bg-sky-500/15 text-sky-500 border-sky-300 border-2 hover:bg-sky-500/20 transition-none",
-        link: "text-primary underline-offset-4 hover:underline",
+          "bg-transparent text-gray-600 hover:bg-blue-50 hover:text-blue-600",
+        SidebarOutline: "bg-blue-50 text-blue-600 hover:bg-blue-100",
+        link: "text-blue-600 underline-offset-4 hover:underline",
       },
       size: {
         default: "h-11 px-4 py-2",

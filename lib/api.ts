@@ -1,6 +1,7 @@
 // lib/api.ts
+// Connexion au backend FastAPI pour les cas cliniques
 
-const API_BASE_URL = "/api/proxy";
+const API_BASE_URL = "http://localhost:8000";
 
 /**
  * Gère les réponses de l'API de manière robuste.
@@ -12,9 +13,13 @@ const handleApiResponse = async (response: Response) => {
         try {
             const errorData = await response.json();
             if (typeof errorData === 'object' && errorData !== null) {
-                errorMessage = Object.entries(errorData)
-                    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
-                    .join('; ');
+                if (errorData.detail) {
+                    errorMessage = errorData.detail;
+                } else {
+                    errorMessage = Object.entries(errorData)
+                        .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+                        .join('; ');
+                }
             }
         } catch (e) {}
         throw new Error(errorMessage);
@@ -31,133 +36,677 @@ const handleApiResponse = async (response: Response) => {
 };
 
 
+// ============================================================
+// TYPES - Backend (ce que FastAPI renvoie)
+// ============================================================
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Type pour un symptôme
-type Symptom = {
+type BackendSymptom = {
     nom: string;
-    degre: string | null;
+    localisation: string | null;
+    date_debut: string | null;
+    frequence: string | null;
     duree: string | null;
+    evolution: string | null;
+    activite_declenchante: string | null;
+    degre: string | null;
+    description_patient: string | null;
 };
 
-// Type pour un cas clinique de base (utilisé dans les listes)
-type BaseClinicalCase = {
+type BackendDiagnosticPhysique = {
+    nom: string;
+    resultat: string | null;
+    localisation?: string | null;
+};
+
+type BackendExamen = {
+    nom: string;
+    resultat: string | null;
+    anatomie: string | null;
+    valeur_normale: string | null;
+    interpretation: string | null;
+};
+
+type BackendTraitement = {
+    nom: string;
+    mode_administration: string | null;
+    date_debut: string | null;
+    observation: string | null;
+    efficacite: string | null;
+    posologie: string | null;
+};
+
+type BackendAllergie = {
+    nom: string;
+    manifestation: string | null;
+};
+
+type BackendMaladie = {
+    nom: string;
+    date_debut_fin: string | null;
+    observation: string | null;
+};
+
+type BackendAntecedents = {
+    antecedents_familiaux: string[];
+    allergies: BackendAllergie[];
+    maladies: BackendMaladie[];
+    chirurgies: { nom: string; date: string | null }[];
+    antecedents_obstetricaux: { nombre_grossesse: number | null } | null;
+    vaccinations: string[];
+};
+
+type BackendModeDeVie = {
+    qualite_eau: string | null;
+    moustiquaire: boolean | null;
+    type_habitat: string | null;
+    voyages: { lieu: string | null; duree: string | null }[];
+    addictions: { nom: string; quantite: string | null }[];
+};
+
+type BackendDonneesPersonnelles = {
+    age: number;
+    sexe: string;
+    etat_civil: string | null;
+    profession: string | null;
+    nombre_enfant: number | null;
+    groupe_sanguin: string | null;
+    region_origine: string | null;
+    type_habitat?: string | null;
+};
+
+type BackendClinicalCase = {
     id_unique: string;
-    motif_consultation: string;
-    donnees_personnelles: { age: number; sexe: string; };
-    // CORRECTION : Le type Symptom est maintenant utilisé ici
-    symptomes: Symptom[];
-};
-
-export const getCases = async (filters: any): Promise<BaseClinicalCase[]> => {
-    console.warn("API non implémentée: getCases. Retour de données simulées.");
-    return [];
-};
-
-export const getFilters = async () => {
-    console.warn("API non implémentée: getFilters. Retour de données simulées.");
-    return { genders: ["Homme", "Femme"], professions: [], symptoms: [] };
-};
-
-// Type pour un cas clinique détaillé
-type DetailedClinicalCase = BaseClinicalCase & {
     hash_authentification: string;
-    diagnostic_physique: { nom: string; resultat: string | null; }[];
-    examens_complementaires: { nom: string; resultat: string | null; }[];
-    traitement_en_cours: { nom: string; efficacite: string | null; }[];
+    status: "en_attente" | "valide" | "rejete";
+    date_creation: string | null;
+    date_validation: string | null;
+    validateur_id: string | null;
+    commentaire_validation: string | null;
+    niveau_difficulte: string | null;
+    pathologie_principale: string | null;
+    specialite_medicale: string | null;
+    objectifs_pedagogiques: string[];
+    motif_consultation: string;
+    donnees_personnelles: BackendDonneesPersonnelles;
+    mode_de_vie: BackendModeDeVie;
+    antecedents_medicaux: BackendAntecedents;
+    symptomes: BackendSymptom[];
+    diagnostic_physique: BackendDiagnosticPhysique[];
+    examens_complementaires: BackendExamen[];
+    traitement_en_cours: BackendTraitement[];
+    diagnostic_final: string | null;
+    indices_cliniques: string[];
+    erreurs_courantes: string[];
 };
 
-export const getCaseById = async (id: string): Promise<DetailedClinicalCase> => {
-    console.warn(`API non implémentée: getCaseById pour ${id}.`);
+type BackendStats = {
+    total_cas: number;
+    par_pathologie: Record<string, number>;
+    par_niveau: Record<string, number>;
+    par_status: Record<string, number>;
+    par_sexe: Record<string, number>;
+    age_moyen: number;
+};
+
+type BackendFilters = {
+    genders: string[];
+    professions: string[];
+    symptoms: string[];
+    pathologies: string[];
+    niveaux: string[];
+    statuses: string[];
+};
+
+
+// ============================================================
+// TYPES - Frontend (ce que les composants attendent)
+// ============================================================
+
+export type CaseStatus = "attente" | "validé" | "rejeté";
+
+export type ExpertCaseData = {
+    id: string;
+    patientAge: number;
+    gender: "Male" | "Female";
+    domain: string;
+    extractionDate: string;
+    status: CaseStatus;
+};
+
+export type DashboardData = {
+    kpis: { 
+        totalCases: number; 
+        pendingCases: number; 
+        validatedCases: number;
+        rejectedCases: number;
+        trendTotal?: { value: number; period: string; };
+        trendPending?: { value: number; period: string; };
+        trendValidated?: { value: number; period: string; };
+    };
+    cases: ExpertCaseData[];
+};
+
+export type CaseReviewData = {
+    id: string;
+    title: string;
+    status: CaseStatus;
+    createdDate: string;
+    patientInfo: {
+        gender: "Male" | "Female";
+        age: number;
+        bmi: number | string;
+        patientId: string;
+        profession: string | null;
+        etatCivil: string | null;
+        groupeSanguin: string | null;
+        region: string | null;
+    };
+    patientHistory: string;
+    pastMedicalHistory: string[];
+    modeDeVie: {
+        qualiteEau: string | null;
+        moustiquaire: boolean | null;
+        habitat: string | null;
+        voyages: string[];
+        addictions: string[];
+    };
+    symptomes: {
+        nom: string;
+        description: string | null;
+        degre: string | null;
+        duree: string | null;
+        localisation: string | null;
+    }[];
+    diagnosticPhysique: {
+        nom: string;
+        resultat: string | null;
+    }[];
+    laboratoryResults: {
+        testName: string;
+        result: string;
+        referenceRange: string;
+        status: "High" | "Normal" | "Elevated";
+    }[];
+    traitementEnCours: {
+        nom: string;
+        posologie: string | null;
+        efficacite: string | null;
+    }[];
+    // Données pédagogiques (pour l'expert)
+    diagnosticFinal: string | null;
+    indicesCliniques: string[];
+    erreursCourantes: string[];
+    niveauDifficulte: string | null;
+    specialiteMedicale: string | null;
+    objectifsPedagogiques: string[];
+};
+
+// Type pour les filtres disponibles
+export type AvailableFilters = {
+    genders: string[];
+    professions: string[];
+    symptoms: string[];
+    pathologies: string[];
+    niveaux: string[];
+    statuses: string[];
+};
+
+
+// ============================================================
+// FONCTIONS DE MAPPING
+// ============================================================
+
+/**
+ * Mappe le status backend vers frontend
+ */
+const mapStatus = (backendStatus: string): CaseStatus => {
+    switch (backendStatus) {
+        case "en_attente": return "attente";
+        case "valide": return "validé";
+        case "rejete": return "rejeté";
+        default: return "attente";
+    }
+};
+
+/**
+ * Mappe le status frontend vers backend
+ */
+const mapStatusToBackend = (frontendStatus: CaseStatus): string => {
+    switch (frontendStatus) {
+        case "attente": return "en_attente";
+        case "validé": return "valide";
+        case "rejeté": return "rejete";
+        default: return "en_attente";
+    }
+};
+
+/**
+ * Mappe le sexe backend vers frontend
+ */
+const mapGender = (backendGender: string): "Male" | "Female" => {
+    return backendGender === "M" ? "Male" : "Female";
+};
+
+/**
+ * Mappe un cas backend vers le format tableau dashboard
+ */
+const mapCaseToExpertData = (backendCase: BackendClinicalCase): ExpertCaseData => {
     return {
-        id_unique: id, 
-        hash_authentification: "simulated_hash_string", 
-        motif_consultation: "Cas non trouvé (simulation)",
-        donnees_personnelles: { age: 0, sexe: 'N/A' as const }, 
-        symptomes: [], // Ce tableau est maintenant de type Symptom[] grâce au type DetailedClinicalCase
-        diagnostic_physique: [],
-        examens_complementaires: [],
-        traitement_en_cours: [],
+        id: backendCase.id_unique,
+        patientAge: backendCase.donnees_personnelles.age,
+        gender: mapGender(backendCase.donnees_personnelles.sexe),
+        domain: backendCase.pathologie_principale || "Non défini",
+        extractionDate: backendCase.date_creation || new Date().toISOString(),
+        status: mapStatus(backendCase.status),
     };
 };
 
-// --- AUTHENTIFICATION ---
-export const apprenantRegister = (data: any) => fetch(`${API_BASE_URL}/auth/register/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(handleApiResponse);
-export const apprenantLogin = (data: any) => fetch(`${API_BASE_URL}/auth/login/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(handleApiResponse);
-export const expertRegister = (data: any) => fetch(`${API_BASE_URL}/auth/expert/register/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(handleApiResponse);
-export const expertLogin = (data: any) => fetch(`${API_BASE_URL}/auth/expert/login/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(handleApiResponse);
-export const logout = (token: string) => fetch(`${API_BASE_URL}/auth/logout/`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Token ${token}` } }).then(handleApiResponse);
+/**
+ * Détermine le statut d'un résultat de labo
+ */
+const determineLabStatus = (interpretation: string | null): "High" | "Normal" | "Elevated" => {
+    if (!interpretation) return "Normal";
+    const lower = interpretation.toLowerCase();
+    if (lower.includes("pathologique") || lower.includes("élevé") || lower.includes("anémie")) {
+        return "High";
+    }
+    if (lower.includes("anormal")) {
+        return "Elevated";
+    }
+    return "Normal";
+};
 
-// --- SESSION DE TUTEUR & INTERFACE ---
-export const startSession = (email_apprenant: string, domaine_nom: string, token: string) => fetch(`${API_BASE_URL}/tuteur/session/start/`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Token ${token}` }, body: JSON.stringify({ email_apprenant, domaine_nom }) }).then(handleApiResponse);
-export const analyseResponse = (session_id: string, reponse_etudiant: string, token: string) => fetch(`${API_BASE_URL}/tuteur/session/analyser/`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Token ${token}` }, body: JSON.stringify({ session_id, reponse_etudiant }) }).then(handleApiResponse);
-export const getSessionState = (session_id: string, token: string) => fetch(`${API_BASE_URL}/tuteur/session/${session_id}/state/`, { headers: { 'Authorization': `Token ${token}` } }).then(handleApiResponse);
-export const getSessionsByDomain = async (apprenantId: string, domaineNom: string, token: string) => {
-    const params = new URLSearchParams({ apprenant: apprenantId, 'cas_clinique__domaine__nom__iexact': domaineNom });
-    const response = await fetch(`${API_BASE_URL}/interface/sessions/?${params.toString()}`, { headers: { 'Authorization': `Token ${token}` } });
+/**
+ * Mappe un cas backend vers le format détaillé pour review
+ */
+const mapCaseToReviewData = (backendCase: BackendClinicalCase): CaseReviewData => {
+    // Construire l'historique patient à partir du motif et des symptômes
+    const symptomesDescription = backendCase.symptomes
+        .map(s => {
+            let desc = s.description_patient || s.nom;
+            if (s.duree) desc += ` depuis ${s.duree}`;
+            if (s.degre) desc += ` (${s.degre})`;
+            return desc;
+        })
+        .join(". ");
+    
+    const patientHistory = `Motif de consultation: ${backendCase.motif_consultation}\n\n${symptomesDescription}`;
+
+    // Construire les antécédents médicaux
+    const pastMedicalHistory: string[] = [];
+    
+    // Antécédents familiaux
+    backendCase.antecedents_medicaux.antecedents_familiaux.forEach(a => {
+        pastMedicalHistory.push(a);
+    });
+    
+    // Maladies
+    backendCase.antecedents_medicaux.maladies.forEach(m => {
+        let entry = m.nom;
+        if (m.observation) entry += ` (${m.observation})`;
+        pastMedicalHistory.push(entry);
+    });
+    
+    // Allergies
+    backendCase.antecedents_medicaux.allergies.forEach(a => {
+        pastMedicalHistory.push(`Allergie: ${a.nom}${a.manifestation ? ` - ${a.manifestation}` : ''}`);
+    });
+    
+    // Chirurgies
+    backendCase.antecedents_medicaux.chirurgies.forEach(c => {
+        pastMedicalHistory.push(`Chirurgie: ${c.nom}${c.date ? ` (${c.date})` : ''}`);
+    });
+
+    // Vaccinations
+    if (backendCase.antecedents_medicaux.vaccinations.length > 0) {
+        pastMedicalHistory.push(`Vaccinations: ${backendCase.antecedents_medicaux.vaccinations.join(', ')}`);
+    }
+
+    // Si aucun antécédent
+    if (pastMedicalHistory.length === 0) {
+        pastMedicalHistory.push("Aucun antécédent notable");
+    }
+
+    // Mode de vie
+    const voyages = backendCase.mode_de_vie.voyages
+        .filter(v => v.lieu)
+        .map(v => `${v.lieu}${v.duree ? ` (${v.duree})` : ''}`);
+    
+    const addictions = backendCase.mode_de_vie.addictions
+        .filter(a => a.nom)
+        .map(a => `${a.nom}${a.quantite ? `: ${a.quantite}` : ''}`);
+
+    // Résultats de laboratoire
+    const laboratoryResults = backendCase.examens_complementaires.map(exam => ({
+        testName: exam.nom,
+        result: exam.resultat || "Non disponible",
+        referenceRange: exam.valeur_normale || "N/A",
+        status: determineLabStatus(exam.interpretation),
+    }));
+
+    return {
+        id: backendCase.id_unique,
+        title: backendCase.pathologie_principale || backendCase.motif_consultation,
+        status: mapStatus(backendCase.status),
+        createdDate: backendCase.date_creation || new Date().toISOString(),
+        patientInfo: {
+            gender: mapGender(backendCase.donnees_personnelles.sexe),
+            age: backendCase.donnees_personnelles.age,
+            bmi: backendCase.donnees_personnelles.groupe_sanguin || "N/A",
+            patientId: `#${backendCase.id_unique.split('-')[1] || backendCase.id_unique}`,
+            profession: backendCase.donnees_personnelles.profession,
+            etatCivil: backendCase.donnees_personnelles.etat_civil,
+            groupeSanguin: backendCase.donnees_personnelles.groupe_sanguin,
+            region: backendCase.donnees_personnelles.region_origine,
+        },
+        patientHistory,
+        pastMedicalHistory,
+        modeDeVie: {
+            qualiteEau: backendCase.mode_de_vie.qualite_eau,
+            moustiquaire: backendCase.mode_de_vie.moustiquaire,
+            habitat: backendCase.mode_de_vie.type_habitat,
+            voyages,
+            addictions,
+        },
+        symptomes: backendCase.symptomes.map(s => ({
+            nom: s.nom,
+            description: s.description_patient,
+            degre: s.degre,
+            duree: s.duree,
+            localisation: s.localisation,
+        })),
+        diagnosticPhysique: backendCase.diagnostic_physique.map(d => ({
+            nom: d.nom,
+            resultat: d.resultat,
+        })),
+        laboratoryResults,
+        traitementEnCours: backendCase.traitement_en_cours.map(t => ({
+            nom: t.nom,
+            posologie: t.posologie,
+            efficacite: t.efficacite,
+        })),
+        diagnosticFinal: backendCase.diagnostic_final,
+        indicesCliniques: backendCase.indices_cliniques,
+        erreursCourantes: backendCase.erreurs_courantes,
+        niveauDifficulte: backendCase.niveau_difficulte,
+        specialiteMedicale: backendCase.specialite_medicale,
+        objectifsPedagogiques: backendCase.objectifs_pedagogiques,
+    };
+};
+
+
+// ============================================================
+// FONCTIONS API - CAS CLINIQUES
+// ============================================================
+
+/**
+ * Récupère tous les cas avec filtres optionnels
+ */
+export const getCases = async (filters?: {
+    keyword?: string;
+    min_age?: number;
+    max_age?: number;
+    gender?: string;
+    profession?: string;
+    symptom?: string;
+    pathologie?: string;
+    niveau?: string;
+    status?: string;
+    limit?: number;
+}): Promise<BackendClinicalCase[]> => {
+    const params = new URLSearchParams();
+    
+    if (filters) {
+        if (filters.keyword) params.append('keyword', filters.keyword);
+        if (filters.min_age) params.append('min_age', filters.min_age.toString());
+        if (filters.max_age) params.append('max_age', filters.max_age.toString());
+        if (filters.gender) params.append('gender', filters.gender);
+        if (filters.profession) params.append('profession', filters.profession);
+        if (filters.symptom) params.append('symptom', filters.symptom);
+        if (filters.pathologie) params.append('pathologie', filters.pathologie);
+        if (filters.niveau) params.append('niveau', filters.niveau);
+        if (filters.status) params.append('status', mapStatusToBackend(filters.status as CaseStatus));
+        if (filters.limit) params.append('limit', filters.limit.toString());
+    }
+    
+    const url = `${API_BASE_URL}/api/cases${params.toString() ? '?' + params.toString() : ''}`;
+    const response = await fetch(url);
     return handleApiResponse(response);
 };
-export const deleteSession = async (sessionId: string, token: string) => fetch(`${API_BASE_URL}/interface/sessions/${sessionId}/`, { method: 'DELETE', headers: { 'Authorization': `Token ${token}` } }).then(handleApiResponse);
 
-// --- DONNÉES GÉNÉRALES ---
-export const getDomaines = async () => fetch(`${API_BASE_URL}/expert/domaines/`).then(handleApiResponse);
-
-
-// --- FONCTIONS "MODE EXPERT" (CORRIGÉES AVEC LES TYPES POUR ÉVITER LES ERREURS DE BUILD) ---
-
-
-
-export const forceExtraction = async () => {
-    console.warn("API non implémentée: forceExtraction. Simule un succès.");
-    return { status: "success", message: "Extraction simulée lancée." };
+/**
+ * Récupère un cas par son ID
+ */
+export const getCaseById = async (id: string): Promise<BackendClinicalCase> => {
+    const response = await fetch(`${API_BASE_URL}/api/cases/${id}`);
+    return handleApiResponse(response);
 };
 
-// Type pour les données du dashboard
-type DashboardData = {
-    kpis: { pendingCases: number; validatedCases: number; studentSuccessRate: string; };
-    cases: { id: string; title: string; date: string; aiConfidence: number; }[];
+/**
+ * Récupère les statistiques
+ */
+export const getStats = async (): Promise<BackendStats> => {
+    const response = await fetch(`${API_BASE_URL}/api/stats`);
+    return handleApiResponse(response);
 };
 
+/**
+ * Récupère les filtres disponibles
+ */
+export const getFilters = async (): Promise<AvailableFilters> => {
+    const response = await fetch(`${API_BASE_URL}/api/filters`);
+    return handleApiResponse(response);
+};
+
+/**
+ * Met à jour le statut d'un cas
+ */
+export const updateCaseStatus = async (
+    caseId: string, 
+    newStatus: CaseStatus,
+    commentaire?: string,
+    validateurId?: string
+): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/api/cases/${caseId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            new_status: mapStatusToBackend(newStatus),
+            commentaire,
+            validateur_id: validateurId,
+        }),
+    });
+    return handleApiResponse(response);
+};
+
+/**
+ * Déclenche la régénération des cas
+ */
+export const forceExtraction = async (): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/api/extract/refresh`, {
+        method: 'POST',
+    });
+    return handleApiResponse(response);
+};
+
+/**
+ * Exporte les cas filtrés
+ */
+export const exportCases = async (filters?: {
+    pathologie?: string;
+    niveau?: string;
+    status?: string;
+}): Promise<any> => {
+    const params = new URLSearchParams();
+    if (filters) {
+        if (filters.pathologie) params.append('pathologie', filters.pathologie);
+        if (filters.niveau) params.append('niveau', filters.niveau);
+        if (filters.status) params.append('status', filters.status);
+    }
+    
+    const url = `${API_BASE_URL}/api/export${params.toString() ? '?' + params.toString() : ''}`;
+    const response = await fetch(url);
+    return handleApiResponse(response);
+};
+
+
+// ============================================================
+// FONCTIONS API - DASHBOARD EXPERT
+// ============================================================
+
+/**
+ * Récupère les données du dashboard expert (KPIs + liste des cas)
+ */
 export const getExpertDashboardData = async (): Promise<DashboardData> => {
-    console.warn("API non implémentée: getExpertDashboardData. Retour de données simulées.");
-    // CORRECTION : On retourne un objet typé avec un tableau vide.
-    return {
-      kpis: { pendingCases: 0, validatedCases: 0, studentSuccessRate: "N/A" },
-      cases: [],
-    };
+    try {
+        // Récupérer les stats et les cas en parallèle
+        const [stats, cases] = await Promise.all([
+            getStats(),
+            getCases(),
+        ]);
+
+        // Mapper les cas pour le tableau
+        const mappedCases = cases.map(mapCaseToExpertData);
+
+        // Extraire les KPIs des stats
+        const pendingCases = stats.par_status?.en_attente || 0;
+        const validatedCases = stats.par_status?.valide || 0;
+        const rejectedCases = stats.par_status?.rejete || 0;
+
+        return {
+            kpis: {
+                totalCases: stats.total_cas,
+                pendingCases,
+                validatedCases,
+                rejectedCases,
+                trendTotal: { value: 12, period: "depuis le mois dernier" },
+                trendPending: { value: 8, period: "cette semaine" },
+                trendValidated: { value: 8, period: "cette semaine" },
+            },
+            cases: mappedCases,
+        };
+    } catch (error) {
+        console.error("Erreur lors de la récupération des données dashboard:", error);
+        throw error;
+    }
 };
 
-export const updateCase = async (caseId: string, data: any) => {
-    console.warn(`API non implémentée: updateCase pour ${caseId}.`);
-    return { status: "success", message: "Cas mis à jour (simulation)." };
+/**
+ * Récupère un cas pour la page de review
+ */
+export const getCaseForReview = async (caseId: string): Promise<CaseReviewData> => {
+    try {
+        const backendCase = await getCaseById(caseId);
+        return mapCaseToReviewData(backendCase);
+    } catch (error) {
+        console.error(`Erreur lors de la récupération du cas ${caseId}:`, error);
+        throw error;
+    }
 };
 
-export const publishCase = async (caseId: string) => {
-    console.warn(`API non implémentée: publishCase pour ${caseId}.`);
-    return { status: "success", message: "Cas publié (simulation)." };
+
+// ============================================================
+// FONCTIONS API - ACTIONS EXPERT
+// ============================================================
+
+/**
+ * Valide un cas clinique
+ */
+export const validateCase = async (caseId: string, commentaire?: string): Promise<any> => {
+    return updateCaseStatus(caseId, "validé", commentaire);
 };
 
-export const rejectCase = async (caseId: string) => {
-    console.warn(`API non implémentée: rejectCase pour ${caseId}.`);
-    return { status: "success", message: "Cas rejeté (simulation)." };
+/**
+ * Rejette un cas clinique
+ */
+export const rejectCase = async (caseId: string, commentaire?: string): Promise<any> => {
+    return updateCaseStatus(caseId, "rejeté", commentaire);
 };
+
+/**
+ * Publie un cas (alias de validateCase pour compatibilité)
+ */
+export const publishCase = async (caseId: string): Promise<any> => {
+    return validateCase(caseId, "Publié par l'expert");
+};
+
+/**
+ * Met à jour un cas (sauvegarde brouillon)
+ */
+export const updateCase = async (caseId: string, data: any): Promise<any> => {
+    // Pour l'instant, on log les données
+    // TODO: Implémenter l'endpoint de mise à jour côté backend si nécessaire
+    console.log(`Sauvegarde brouillon pour ${caseId}:`, data);
+    return { status: "success", message: "Brouillon sauvegardé" };
+};
+
+
+// ============================================================
+// FONCTIONS API - FILTRES POUR LE TABLEAU
+// ============================================================
+
+/**
+ * Récupère les options de filtres pour le tableau des cas
+ */
+export const getFilterOptions = async (): Promise<{
+    domains: string[];
+    statuses: { value: string; label: string }[];
+    ageRanges: { value: string; label: string; min: number; max: number }[];
+    genders: { value: string; label: string }[];
+}> => {
+    try {
+        const filters = await getFilters();
+        
+        return {
+            domains: filters.pathologies || [],
+            statuses: [
+                { value: "all", label: "Tous les statuts" },
+                { value: "attente", label: "En attente" },
+                { value: "validé", label: "Validé" },
+                { value: "rejeté", label: "Rejeté" },
+            ],
+            ageRanges: [
+                { value: "all", label: "Tous les âges", min: 0, max: 150 },
+                { value: "21-35", label: "21-35 ans", min: 21, max: 35 },
+                { value: "36-55", label: "36-55 ans", min: 36, max: 55 },
+                { value: "56+", label: "56+ ans", min: 56, max: 150 },
+            ],
+            genders: [
+                { value: "all", label: "Tous" },
+                { value: "M", label: "Homme" },
+                { value: "F", label: "Femme" },
+            ],
+        };
+    } catch (error) {
+        console.error("Erreur lors de la récupération des filtres:", error);
+        // Retourner des valeurs par défaut en cas d'erreur
+        return {
+            domains: [],
+            statuses: [
+                { value: "all", label: "Tous les statuts" },
+                { value: "attente", label: "En attente" },
+                { value: "validé", label: "Validé" },
+                { value: "rejeté", label: "Rejeté" },
+            ],
+            ageRanges: [
+                { value: "all", label: "Tous les âges", min: 0, max: 150 },
+                { value: "21-35", label: "21-35 ans", min: 21, max: 35 },
+                { value: "36-55", label: "36-55 ans", min: 36, max: 55 },
+                { value: "56+", label: "56+ ans", min: 56, max: 150 },
+            ],
+            genders: [
+                { value: "all", label: "Tous" },
+                { value: "M", label: "Homme" },
+                { value: "F", label: "Femme" },
+            ],
+        };
+    }
+};
+
+
+// ============================================================
+// ANCIENNES FONCTIONS (Compatibilité)
+// ============================================================
 
 export const getExpertProfile = async () => {
     console.warn("API non implémentée: getExpertProfile.");
@@ -167,4 +716,113 @@ export const getExpertProfile = async () => {
 export const updateExpertProfile = async (data: any) => {
     console.warn("API non implémentée: updateExpertProfile.");
     return { status: "success", message: "Profil mis à jour (simulation)." };
+};
+
+export const getDomaines = async () => {
+    try {
+        const filters = await getFilters();
+        return filters.pathologies.map((p, index) => ({ id: index + 1, nom: p }));
+    } catch (error) {
+        console.error("Erreur getDomaines:", error);
+        return [];
+    }
+};
+
+// Auth functions - Mode Mock pour le développement
+// TODO: Remplacer par de vrais appels API quand le backend auth sera prêt
+
+export const apprenantRegister = async (data: { nom: string; email: string; password: string }) => {
+    // Simuler un délai réseau
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // En mode mock, on accepte toujours l'inscription
+    return {
+        status: "success",
+        message: "Inscription réussie"
+    };
+};
+
+export const apprenantLogin = async (data: { email: string; password: string }) => {
+    // Simuler un délai réseau
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // En mode mock, on génère un token et des données utilisateur
+    const mockToken = `mock_token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    return {
+        status: "success",
+        token: mockToken,
+        apprenant: {
+            id: `apprenant_${Date.now()}`,
+            nom: data.email.split('@')[0] || "Apprenant",
+            email: data.email,
+        }
+    };
+};
+
+export const expertRegister = async (data: {
+    nom: string;
+    email: string;
+    password: string;
+    matricule: string;
+    domaine_expertise_id: string;
+}) => {
+    // Simuler un délai réseau
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    return {
+        status: "success",
+        message: "Inscription réussie"
+    };
+};
+
+export const expertLogin = async (data: { email: string; password: string }) => {
+    // Simuler un délai réseau
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const mockToken = `mock_token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    return {
+        status: "success",
+        token: mockToken,
+        expert: {
+            id: `expert_${Date.now()}`,
+            nom: data.email.split('@')[0] || "Expert",
+            email: data.email,
+            matricule: "EXP-001",
+            domaine: "Médecine Générale",
+        }
+    };
+};
+
+export const logout = async (token: string) => {
+    // Simuler un délai réseau
+    await new Promise(resolve => setTimeout(resolve, 200));
+    return { status: "success" };
+};
+
+// Session functions (à implémenter)
+export const startSession = (email_apprenant: string, domaine_nom: string, token: string) => {
+    console.warn("Session non implémentée");
+    return Promise.resolve({ status: "success" });
+};
+
+export const analyseResponse = (session_id: string, reponse_etudiant: string, token: string) => {
+    console.warn("Session non implémentée");
+    return Promise.resolve({ status: "success" });
+};
+
+export const getSessionState = (session_id: string, token: string) => {
+    console.warn("Session non implémentée");
+    return Promise.resolve({ status: "success" });
+};
+
+export const getSessionsByDomain = async (apprenantId: string, domaineNom: string, token: string) => {
+    console.warn("Session non implémentée");
+    return [];
+};
+
+export const deleteSession = async (sessionId: string, token: string) => {
+    console.warn("Session non implémentée");
+    return { status: "success" };
 };

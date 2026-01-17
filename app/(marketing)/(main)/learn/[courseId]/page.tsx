@@ -5,12 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
-import { getSessionsByDomain, startSession, deleteSession } from "@/lib/api";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Loader2, PlusCircle, MessageSquare, Clock, MoreVertical, Trash2, CheckCircle, Activity } from "lucide-react";
+import { Loader2, PlusCircle, MessageSquare, Clock, CheckCircle, Activity } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 // Structure de données pour les cours (pour l'image)
@@ -47,37 +44,60 @@ export default function CourseSessionsPage() {
     const [isCreating, setIsCreating] = useState(false);
 
     useEffect(() => {
-        if (isAuthLoading || !user || !token) return;
+        // Attendre que l'authentification soit chargée
+        if (isAuthLoading) {
+            return;
+        }
+
+        // Si pas d'utilisateur après le chargement, on ne fait rien ici
+        // Le rendu conditionnel plus bas gèrera l'affichage
+        if (!user) {
+            setIsLoading(false);
+            return;
+        }
+
         setIsLoading(true);
-        getSessionsByDomain(user.id, domaineNom, token)
-            .then(setSessions)
-            .catch(() => toast.error("Impossible de charger l'historique des sessions."))
-            .finally(() => setIsLoading(false));
-    }, [isAuthLoading, user, token, domaineNom]);
+        const mockSessions: SessionData[] = [
+            {
+                id: 'SESSION-1',
+                date_debut: new Date().toISOString(),
+                date_fin: null,
+                interaction_count: 5,
+                score_session: 0,
+                cas_clinique: {
+                    titre: 'Cas de Paludisme Simple',
+                },
+            },
+            {
+                id: 'SESSION-2',
+                date_debut: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+                date_fin: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000).toISOString(),
+                interaction_count: 15,
+                score_session: 85,
+                cas_clinique: {
+                    titre: 'Cas de Paludisme Sévère',
+                },
+            },
+        ];
+        setSessions(mockSessions);
+        setIsLoading(false);
+    }, [courseId, isAuthLoading, user, router]);
 
     const handleStartNewSession = async () => {
-        if (!user || !token) return;
+        if (!user) {
+            toast.error("Vous devez être connecté pour démarrer une session.");
+            return;
+        }
         setIsCreating(true);
-        try {
-            toast.info("Création d'un nouveau cas clinique...");
-            const newSession = await startSession(user.email, domaineNom, token);
-            router.push(`/learn/${courseId}/lesson/${newSession.session_id}`);
-        } catch (error: any) {
-            toast.error(`Erreur: ${error.message}`);
-        } finally {
-            setIsCreating(false);
-        }
-    };
+        toast.info("Création d'un nouveau cas clinique simulé...");
 
-    const handleDeleteSession = async (sessionId: string) => {
-        if (!token) return;
-        try {
-            await deleteSession(sessionId, token);
-            setSessions(prev => prev.filter(s => s.id !== sessionId));
-            toast.success("Session supprimée avec succès.");
-        } catch (error) {
-            toast.error("Erreur lors de la suppression de la session.");
-        }
+        // Simulation d'un appel API
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        const newSessionId = `SESSION-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+        
+        setIsCreating(false);
+        router.push(`/learn/${courseId}/lesson/${newSessionId}`);
     };
 
     if (isLoading || isAuthLoading) {
@@ -86,6 +106,18 @@ export default function CourseSessionsPage() {
                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
             </div>
         );
+    }
+    
+    // Si l'utilisateur n'est pas authentifié après le chargement, on peut afficher un message
+    if (!user) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full gap-4">
+                <p className="text-slate-600">Vous devez être connecté pour voir cette page.</p>
+                <Link href="/">
+                    <Button>Se connecter</Button>
+                </Link>
+            </div>
+        )
     }
 
     return (
@@ -140,37 +172,6 @@ export default function CourseSessionsPage() {
                                             </div>
                                         </div>
                                     </Link>
-                                    <AlertDialog>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="shrink-0 text-slate-400 group-hover:text-slate-600">
-                                                    <MoreVertical className="h-5 w-5" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <AlertDialogTrigger asChild>
-                                                    <DropdownMenuItem className="text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer">
-                                                        <Trash2 className="mr-2 h-4 w-4" />
-                                                        Supprimer
-                                                    </DropdownMenuItem>
-                                                </AlertDialogTrigger>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
-                                                <AlertDialogDescription>
-                                                    Êtes-vous sûr de vouloir supprimer cette session ? L'historique de la conversation sera perdu définitivement. Cette action est irréversible.
-                                                </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Annuler</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => handleDeleteSession(session.id)} className="bg-destructive hover:bg-destructive/90">
-                                                    Oui, supprimer
-                                                </AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
                                </CardContent>
                            </Card>
                         ))}

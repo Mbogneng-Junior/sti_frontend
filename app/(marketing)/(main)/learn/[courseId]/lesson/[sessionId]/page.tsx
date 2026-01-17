@@ -1,245 +1,539 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ArrowLeft, Send, Stethoscope, User, GraduationCap, Loader2, Sparkles, BarChart, BookOpen, AlertCircle } from "lucide-react";
-import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
-import { analyseResponse, getSessionState } from "@/lib/api"; 
+import { analyseResponse, getSessionState } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Settings,
+  Send,
+  Loader2,
+  User,
+  Stethoscope,
+  FlaskConical,
+  Pill,
+  Activity,
+  Heart,
+  Wind,
+  FileText,
+  Clock,
+  History,
+  StickyNote,
+  ArrowUp,
+  CheckCircle,
+  AlertCircle,
+  Zap
+} from "lucide-react";
 
-// Types pour les données du backend
+// Types
 type Role = "doctor" | "patient" | "tutor" | "system";
 interface Message {
   person: Role;
   message: string;
-}
-interface StudentProfile {
-  score_global: number;
-  competences: Record<string, number>;
-  feedbacks: { competence: string; points: number; message: string }[];
-  lacunes: any[];
+  timestamp?: string;
 }
 
-// Sous-composant pour la barre latérale du profil (responsive)
-const StudentProfileSidebar = ({ profile }: { profile: StudentProfile | null }) => {
-    // La classe `hidden lg:flex` est la clé : le composant est caché par défaut,
-    // et ne devient visible (en tant que flex container) qu'à partir du breakpoint 'lg' (grands écrans).
-    if (!profile) {
-        return (
-            <div className="hidden lg:flex flex-col w-[350px] p-4 bg-slate-50 border-l-2 items-center justify-center">
-                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-                <p className="text-sm text-slate-500 mt-2">Chargement du profil...</p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="hidden lg:flex flex-col w-[350px] p-4 bg-slate-50 border-l-2 overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><User className="h-5 w-5 text-primary"/> Profil Étudiant</h3>
-            <div className="space-y-4">
-                <div className="bg-white p-3 rounded-lg border">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">XP Global</p>
-                    <p className="text-2xl font-bold flex items-center gap-2 mt-1">
-                        <Sparkles className="h-5 w-5 text-yellow-500"/> {profile.score_global ?? 0}
-                    </p>
-                </div>
-                
-                <div className="bg-white p-3 rounded-lg border">
-                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2"><BarChart className="h-4 w-4"/> Compétences</h4>
-                    <ul className="space-y-1 text-sm">
-                        {Object.keys(profile.competences || {}).length > 0 ? Object.entries(profile.competences).map(([key, value]) => (
-                            <li key={key} className="flex justify-between items-center">
-                                <span className="capitalize text-slate-600">{key}:</span>
-                                <span className="font-semibold px-2 py-0.5 bg-slate-100 rounded text-slate-800">{value}</span>
-                            </li>
-                        )) : <p className="text-xs text-slate-400 italic">Aucun score pour l'instant.</p>}
-                    </ul>
-                </div>
-                
-                <div className="bg-white p-3 rounded-lg border">
-                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2"><BookOpen className="h-4 w-4"/> Feedbacks Récents</h4>
-                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                        {(profile.feedbacks || []).slice(-5).reverse().map((fb, i) => (
-                            <div key={i} className="text-xs p-2 bg-slate-100/70 rounded border">
-                                <p className={`font-bold ${fb.points > 0 ? 'text-green-600' : 'text-red-600'}`}>{fb.competence} ({fb.points > 0 ? '+' : ''}{fb.points} pts)</p>
-                                <p className="text-slate-600">{fb.message}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
+// Donnees simulees du patient
+const PATIENT_DATA = {
+  name: "Alex Johnson",
+  age: 45,
+  gender: "Male",
+  avatar: "/avatars/patient.png",
+  chiefComplaint: "Persistent chest pain and shortness of breath for the last hour.",
+  vitals: {
+    bp: { value: "140/90", status: "elevated" as const },
+    heartRate: { value: "88 bpm", status: "normal" as const },
+    o2Sat: { value: "98%", status: "normal" as const }
+  }
 };
 
+// Donnees simulees des findings
+const INITIAL_FINDINGS = [
+  { id: "1", label: "EKG Ordered", status: "pending" as const },
+  { id: "2", label: "Temp Checked", value: "98.6°F", status: "normal" as const }
+];
 
-// Composant principal de la page de chat
-export default function ChatPage() {
-    const params = useParams();
-    const router = useRouter();
-    const { user, token, isLoading: isAuthLoading, role } = useAuth();
+// Composant pour les signes vitaux
+const VitalSign = ({
+  icon: Icon,
+  label,
+  value,
+  status
+}: {
+  icon: any;
+  label: string;
+  value: string;
+  status: "normal" | "elevated" | "low";
+}) => (
+  <div className="flex items-center gap-3">
+    <div className={`p-2 rounded-lg ${
+      status === "elevated" ? "bg-red-50" : status === "low" ? "bg-amber-50" : "bg-green-50"
+    }`}>
+      <Icon className={`h-4 w-4 ${
+        status === "elevated" ? "text-red-500" : status === "low" ? "text-amber-500" : "text-green-500"
+      }`} />
+    </div>
+    <div>
+      <p className="text-xs text-gray-500">{label}</p>
+      <div className="flex items-center gap-1">
+        <p className="text-sm font-semibold text-gray-900">{value}</p>
+        {status === "elevated" && <ArrowUp className="h-3 w-3 text-red-500" />}
+      </div>
+    </div>
+  </div>
+);
 
-    const courseId = params.courseId as string;
-    const sessionId = params.sessionId as string;
-    const domaineNom = courseId.charAt(0).toUpperCase() + courseId.slice(1);
-    
-    const [isInitialLoading, setIsInitialLoading] = useState(true);
-    const [isSending, setIsSending] = useState(false);
-    const [loadingMessage, setLoadingMessage] = useState("Authentification...");
+// Composant pour les outils medicaux
+const MedicalToolButton = ({
+  icon: Icon,
+  label,
+  description,
+  onClick
+}: {
+  icon: any;
+  label: string;
+  description: string;
+  onClick: () => void;
+}) => (
+  <button
+    onClick={onClick}
+    className="w-full flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors text-left group"
+  >
+    <div className="p-2 rounded-lg bg-blue-50 group-hover:bg-blue-100 transition-colors">
+      <Icon className="h-5 w-5 text-blue-600" />
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="text-sm font-medium text-gray-900">{label}</p>
+      <p className="text-xs text-gray-500 truncate">{description}</p>
+    </div>
+  </button>
+);
 
-    const [input, setInput] = useState("");
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
+// Composant principal
+export default function SimulationPage() {
+  const params = useParams();
+  const router = useRouter();
+  const { user, token, isLoading: isAuthLoading, role } = useAuth();
 
-    const bottomRef = useRef<HTMLDivElement>(null);
+  const courseId = params.courseId as string;
+  const sessionId = params.sessionId as string;
 
-    // Effet pour charger la session
-    useEffect(() => {
-        if (isAuthLoading) return;
-        if (!user || !token || role !== 'apprenant') {
-            router.push('/');
-            return;
-        }
-        if (!sessionId) {
-            setIsInitialLoading(false);
-            setMessages([{ person: "system", message: "ID de session invalide." }]);
-            return;
-        }
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [findings, setFindings] = useState(INITIAL_FINDINGS);
+  const [sessionStartTime] = useState(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
 
-        const loadSession = async () => {
-            setLoadingMessage("Chargement de la session...");
-            try {
-                const state = await getSessionState(sessionId, token);
-                setMessages(state.chat_history || []);
-                setStudentProfile(state.student_profile || null);
-            } catch (error) {
-                setMessages([{ person: "system", message: `Erreur : Impossible de charger la session.` }]);
-            } finally {
-                setIsInitialLoading(false);
-            }
-        };
-        loadSession();
-    }, [isAuthLoading, user, token, role, sessionId, router]);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-    // Effet pour le scroll
-    useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, isSending]);
+  // Charger la session
+  useEffect(() => {
+    // Attendre que l'authentification soit chargée
+    if (isAuthLoading) return;
 
-    // Fonction d'envoi de message
-    const handleSend = async () => {
-        if (!input.trim() || isSending || !sessionId || !token) return;
-        const currentInput = input;
-        setMessages((prev) => [...prev, { person: 'doctor', message: currentInput }]);
-        setInput("");
-        setIsSending(true);
-        try {
-            const response = await analyseResponse(sessionId, currentInput, token);
-            setMessages(response.chat_history || []);
-            setStudentProfile(response.student_profile || null);
-        } catch (error) {
-            setMessages((prev) => [...prev, { person: "system", message: `Erreur: Le serveur n'a pas pu répondre.` }]);
-        } finally {
-            setIsSending(false);
-        }
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === "Enter") handleSend();
-    };
-
-    if (isAuthLoading || isInitialLoading) {
-        return (
-            <div className="flex h-screen w-full items-center justify-center bg-slate-50">
-                <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                    <p className="text-slate-500 font-medium">{loadingMessage}</p>
-                </div>
-            </div>
-        );
+    // Si pas d'utilisateur, afficher le message approprié
+    if (!user || !token) {
+      setIsInitialLoading(false);
+      return;
     }
-    
+
+    if (!sessionId) {
+      setIsInitialLoading(false);
+      setMessages([{ person: "system", message: "Invalid session ID." }]);
+      return;
+    }
+
+    const loadSession = async () => {
+      try {
+        const state = await getSessionState(sessionId, token);
+        setMessages(state.chat_history || [
+          {
+            person: "patient",
+            message: "Je ressens cette pression dans ma poitrine depuis une heure. J'ai du mal à respirer. J'ai un peu peur, honnêtement."
+          }
+        ]);
+      } catch (error) {
+        setMessages([
+          {
+            person: "patient",
+            message: "Je ressens cette pression dans ma poitrine depuis une heure. J'ai du mal à respirer. J'ai un peu peur, honnêtement."
+          }
+        ]);
+      } finally {
+        setIsInitialLoading(false);
+      }
+    };
+    loadSession();
+  }, [isAuthLoading, user, token, sessionId]);
+
+  // Auto-scroll
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isSending]);
+
+  // Envoyer un message
+  const handleSend = async () => {
+    if (!input.trim() || isSending || !sessionId || !token) return;
+
+    const currentInput = input;
+    const newMessage: Message = {
+      person: 'doctor',
+      message: currentInput,
+      timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setMessages(prev => [...prev, newMessage]);
+    setInput("");
+    setIsSending(true);
+
+    try {
+      const response = await analyseResponse(sessionId, currentInput, token);
+      setMessages(response.chat_history || [...messages, newMessage]);
+    } catch (error) {
+      // Simuler une reponse du patient
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          person: "patient",
+          message: "It's a dull ache, mostly in the center of my chest. It does feel a bit tight in my left shoulder too. It started while I was mowing the lawn."
+        }]);
+      }, 1000);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const handleEndConsultation = () => {
+    router.push(`/learn/${courseId}`);
+  };
+
+  const handleMakeDiagnosis = () => {
+    // TODO: Ouvrir modal de diagnostic
+    console.log("Make diagnosis");
+  };
+
+  const handleOrderLabTests = () => {
+    setFindings(prev => [...prev, { id: Date.now().toString(), label: "Blood Panel Ordered", status: "pending" as const }]);
+  };
+
+  const handlePhysicalExam = () => {
+    setMessages(prev => [...prev, {
+      person: "system",
+      message: "Physical Exam: Breath sounds are clear bilaterally. No murmurs noted on auscultation."
+    }]);
+  };
+
+  const handleAdministerMeds = () => {
+    // TODO: Ouvrir modal de medication
+    console.log("Administer meds");
+  };
+
+  if (isAuthLoading || isInitialLoading) {
     return (
-        <div className="flex h-full">
-            <div className="flex flex-col flex-1 bg-slate-100">
-                <div className="bg-white border-b p-2 sm:p-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-                    <Link href={`/learn/${courseId}`}>
-                        <Button variant="ghost" size="sm" className="lg:size-md">
-                            <ArrowLeft className="h-5 w-5 lg:h-6 lg:w-6 text-slate-500" />
-                        </Button>
-                    </Link>
-                    <h2 className="font-bold text-base sm:text-lg text-slate-700 text-center truncate px-2">
-                        Cas: {domaineNom}
-                    </h2>
-                    <div className="w-9 lg:w-10"></div> {/* Espace pour centrer le titre */}
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-6">
-                    {messages.map((msg, index) => (
-                         <div key={index} className={`flex w-full ${ msg.person === "doctor" ? "justify-end" : "justify-start"}`}>
-                            <div className={`flex max-w-[90%] sm:max-w-[80%] items-end ${msg.person === "doctor" ? "flex-row-reverse" : "flex-row"} gap-2 sm:gap-3`}>
-                                <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 shadow-sm border-2 ${
-                                    msg.person === "doctor" ? "bg-green-100 border-green-200" :
-                                    msg.person === "patient" ? "bg-blue-100 border-blue-200" :
-                                    msg.person === "tutor" ? "bg-yellow-100 border-yellow-200" : "bg-red-100 border-red-200"
-                                }`}>
-                                    {msg.person === "doctor" && <Stethoscope className="h-5 w-5 text-green-600" />}
-                                    {msg.person === "patient" && <User className="h-5 w-5 text-blue-600" />}
-                                    {msg.person === "tutor" && <GraduationCap className="h-5 w-5 text-yellow-600" />}
-                                    {msg.person === "system" && <AlertCircle className="h-5 w-5 text-red-600" />}
-                                </div>
-                                <div className={`p-3 sm:p-4 rounded-2xl shadow-sm text-sm sm:text-base relative ${
-                                    msg.person === "doctor" ? "bg-green-500 text-white rounded-tr-none" :
-                                    msg.person === "patient" ? "bg-white text-slate-700 border border-slate-200 rounded-tl-none" :
-                                    msg.person === "tutor" ? "bg-yellow-50 text-yellow-800 border border-yellow-200 font-medium rounded-tl-none w-full" : "bg-red-50 text-red-800 border border-red-200 rounded-tl-none w-full"
-                                }`}>
-                                    {(msg.person === "tutor" || msg.person === "system") && (
-                                        <span className="text-xs font-bold uppercase tracking-wider block mb-1">
-                                            {msg.person === "tutor" ? "Conseil du Tuteur" : "Message Système"}
-                                        </span>
-                                    )}
-                                    <p className="leading-relaxed">{msg.message}</p>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                    
-                    {isSending && (
-                         <div className="flex justify-start w-full">
-                            <div className="flex items-end gap-2 sm:gap-3 ml-14">
-                                <div className="h-10 w-10 rounded-full flex items-center justify-center shrink-0 shadow-sm border-2 bg-slate-100 border-slate-200">
-                                    <User className="h-5 w-5 text-slate-500" />
-                                </div>
-                                <div className="flex items-center gap-2 bg-white px-4 py-3 rounded-2xl border border-slate-200">
-                                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    <div ref={bottomRef} />
-                </div>
-
-                <div className="p-2 sm:p-4 bg-white border-t border-slate-200">
-                    <div className="flex items-center gap-x-2">
-                        <Input
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            placeholder={sessionId ? "Posez votre question au patient..." : "Chargement..."}
-                            disabled={isSending || !sessionId}
-                            className="flex-1 bg-slate-100 border-0 focus-visible:ring-2 focus-visible:ring-green-500 h-12 rounded-xl text-sm sm:text-base"
-                        />
-                        <Button onClick={handleSend} disabled={!input.trim() || isSending || !sessionId} size="icon" className="h-12 w-12 shrink-0 rounded-xl">
-                            {isSending ? <Loader2 className="h-5 w-5 animate-spin"/> : <Send className="h-5 w-5" />}
-                        </Button>
-                    </div>
-                </div>
-            </div>
-            <StudentProfileSidebar profile={studentProfile} />
+      <div className="flex h-screen w-full items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+          <p className="text-gray-500 font-medium">Chargement de la simulation...</p>
         </div>
+      </div>
     );
+  }
+
+  // Si l'utilisateur n'est pas authentifié
+  if (!user || !token) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen gap-4 bg-gray-50">
+        <p className="text-slate-600">Vous devez être connecté pour accéder à cette simulation.</p>
+        <Link href="/">
+          <Button>Se connecter</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-screen bg-gray-50">
+      {/* Left Panel - Patient Info */}
+      <div className="w-72 bg-white border-r border-gray-100 flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <Zap className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="font-semibold text-gray-900 text-sm">Clinical Simulation AI</h1>
+              <div className="flex items-center gap-1">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-xs text-gray-500">Session Active: {sessionStartTime}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Patient Profile */}
+        <div className="p-4 border-b border-gray-100">
+          <div className="flex items-center gap-3 mb-4">
+            <Avatar className="h-14 w-14 ring-2 ring-blue-100">
+              <AvatarImage src={PATIENT_DATA.avatar} />
+              <AvatarFallback className="bg-blue-100 text-blue-600 font-semibold text-lg">
+                {PATIENT_DATA.name.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <h2 className="font-semibold text-gray-900">{PATIENT_DATA.name}</h2>
+              <p className="text-sm text-gray-500">{PATIENT_DATA.age} years old | {PATIENT_DATA.gender}</p>
+            </div>
+          </div>
+
+          {/* Chief Complaint */}
+          <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+            <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-1">Chief Complaint</p>
+            <p className="text-sm text-amber-900">{PATIENT_DATA.chiefComplaint}</p>
+          </div>
+        </div>
+
+        {/* Vitals */}
+        <div className="p-4 border-b border-gray-100">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Current Vitals</p>
+          <div className="space-y-3">
+            <VitalSign icon={Activity} label="BP" value={PATIENT_DATA.vitals.bp.value} status={PATIENT_DATA.vitals.bp.status} />
+            <VitalSign icon={Heart} label="Heart Rate" value={PATIENT_DATA.vitals.heartRate.value} status={PATIENT_DATA.vitals.heartRate.status} />
+            <VitalSign icon={Wind} label="O2 Sat" value={PATIENT_DATA.vitals.o2Sat.value} status={PATIENT_DATA.vitals.o2Sat.status} />
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <div className="p-4 flex-1">
+          <nav className="space-y-1">
+            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-blue-600 bg-blue-50">
+              <User className="h-4 w-4" />
+              Patient Overview
+            </Link>
+            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">
+              <History className="h-4 w-4" />
+              Medical History
+            </Link>
+            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">
+              <StickyNote className="h-4 w-4" />
+              Notes
+            </Link>
+          </nav>
+        </div>
+      </div>
+
+      {/* Center - Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Chat Header */}
+        <div className="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-gray-400" />
+            <span className="text-sm text-gray-500">SIMULATION STARTED - {sessionStartTime}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" className="text-gray-500">
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleEndConsultation}
+              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+            >
+              End Consultation
+            </Button>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <ScrollArea className="flex-1 p-6">
+          <div className="max-w-3xl mx-auto space-y-6">
+            {messages.map((msg, index) => (
+              <div
+                key={index}
+                className={`flex ${msg.person === "doctor" ? "justify-end" : "justify-start"}`}
+              >
+                <div className={`flex items-end gap-3 max-w-[80%] ${msg.person === "doctor" ? "flex-row-reverse" : "flex-row"}`}>
+                  {/* Avatar */}
+                  {msg.person !== "doctor" && msg.person !== "system" && (
+                    <Avatar className="h-8 w-8 shrink-0">
+                      <AvatarFallback className={`text-xs font-medium ${
+                        msg.person === "patient" ? "bg-blue-100 text-blue-600" :
+                        msg.person === "tutor" ? "bg-amber-100 text-amber-600" : "bg-gray-100 text-gray-600"
+                      }`}>
+                        {msg.person === "patient" ? "AJ" : msg.person === "tutor" ? "T" : "S"}
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
+
+                  {/* Message Bubble */}
+                  <div className={`relative ${
+                    msg.person === "doctor"
+                      ? "bg-blue-600 text-white rounded-2xl rounded-br-md"
+                      : msg.person === "patient"
+                        ? "bg-white border border-gray-200 text-gray-900 rounded-2xl rounded-bl-md shadow-sm"
+                        : msg.person === "tutor"
+                          ? "bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl shadow-sm"
+                          : "bg-green-50 border border-green-200 text-green-900 rounded-2xl shadow-sm"
+                  } px-4 py-3`}>
+                    {/* Role indicator for doctor */}
+                    {msg.person === "doctor" && (
+                      <div className="absolute -top-5 right-0">
+                        <Badge variant="secondary" className="text-[10px] bg-blue-100 text-blue-700 font-medium">
+                          Medical Student
+                        </Badge>
+                      </div>
+                    )}
+
+                    {/* Name for patient */}
+                    {msg.person === "patient" && (
+                      <p className="text-xs font-medium text-gray-500 mb-1">{PATIENT_DATA.name}</p>
+                    )}
+
+                    {/* Tutor/System label */}
+                    {(msg.person === "tutor" || msg.person === "system") && (
+                      <p className="text-xs font-semibold uppercase tracking-wide mb-1">
+                        {msg.person === "tutor" ? "Tutor Advice" : "System"}
+                      </p>
+                    )}
+
+                    <p className="text-sm leading-relaxed">{msg.message}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Typing indicator */}
+            {isSending && (
+              <div className="flex justify-start">
+                <div className="flex items-end gap-3">
+                  <Avatar className="h-8 w-8 shrink-0">
+                    <AvatarFallback className="bg-blue-100 text-blue-600 text-xs font-medium">AJ</AvatarFallback>
+                  </Avatar>
+                  <div className="bg-white border border-gray-200 rounded-2xl rounded-bl-md shadow-sm px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={bottomRef} />
+          </div>
+        </ScrollArea>
+
+        {/* Input Area */}
+        <div className="bg-white border-t border-gray-100 p-4">
+          <div className="max-w-3xl mx-auto flex items-center gap-3">
+            <div className="flex-1 relative">
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={`Ask ${PATIENT_DATA.name.split(' ')[0]} a question...`}
+                disabled={isSending}
+                className="bg-gray-50 border-0 h-12 pl-4 pr-12 rounded-xl focus-visible:ring-2 focus-visible:ring-blue-500"
+              />
+            </div>
+            <Button
+              onClick={handleSend}
+              disabled={!input.trim() || isSending}
+              className="h-12 w-12 rounded-xl bg-blue-600 hover:bg-blue-700 shrink-0"
+            >
+              {isSending ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Panel - Medical Tools */}
+      <div className="w-80 bg-white border-l border-gray-100 flex flex-col">
+        {/* Medical Tools */}
+        <div className="p-4 border-b border-gray-100">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Medical Tools
+          </p>
+          <div className="space-y-1">
+            <MedicalToolButton
+              icon={FlaskConical}
+              label="Order Lab Tests"
+              description="Bloodwork, cardiac enzymes, and imaging requests"
+              onClick={handleOrderLabTests}
+            />
+            <MedicalToolButton
+              icon={Stethoscope}
+              label="Physical Exam"
+              description="Perform auscultation, palpation, or neurological checks"
+              onClick={handlePhysicalExam}
+            />
+            <MedicalToolButton
+              icon={Pill}
+              label="Administer Meds"
+              description="Give IV fluids, aspirin, or other urgent treatments"
+              onClick={handleAdministerMeds}
+            />
+          </div>
+        </div>
+
+        {/* Make Diagnosis Button */}
+        <div className="p-4 border-b border-gray-100">
+          <Button
+            onClick={handleMakeDiagnosis}
+            className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-600/25"
+          >
+            <Stethoscope className="h-5 w-5 mr-2" />
+            Make Diagnosis
+          </Button>
+          <p className="text-xs text-gray-500 text-center mt-2">Conclude the simulation</p>
+        </div>
+
+        {/* Recent Findings */}
+        <div className="p-4 flex-1">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Recent Findings</p>
+          <div className="space-y-2">
+            {findings.map((finding) => (
+              <div key={finding.id} className="flex items-center gap-2 text-sm">
+                {finding.status === "pending" ? (
+                  <Clock className="h-4 w-4 text-amber-500" />
+                ) : finding.status === "normal" ? (
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                )}
+                <span className="text-gray-700">{finding.label}</span>
+                {finding.status === "pending" && (
+                  <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700">Pending results</Badge>
+                )}
+                {finding.value && (
+                  <span className="text-gray-500">- {finding.value} <span className="text-green-600">[Normal]</span></span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
