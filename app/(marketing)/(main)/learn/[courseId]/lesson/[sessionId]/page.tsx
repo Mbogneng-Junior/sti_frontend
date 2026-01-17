@@ -135,11 +135,15 @@ export default function SimulationPage() {
 
   // Charger la session
   useEffect(() => {
+    // Attendre que l'authentification soit chargée
     if (isAuthLoading) return;
-    if (!user || !token || role !== 'apprenant') {
-      router.push('/');
+
+    // Si pas d'utilisateur, afficher le message approprié
+    if (!user || !token) {
+      setIsInitialLoading(false);
       return;
     }
+
     if (!sessionId) {
       setIsInitialLoading(false);
       setMessages([{ person: "system", message: "Invalid session ID." }]);
@@ -152,14 +156,14 @@ export default function SimulationPage() {
         setMessages(state.chat_history || [
           {
             person: "patient",
-            message: "I've been feeling this pressure in my chest for the last hour. It makes it hard to catch my breath. I'm a bit scared, honestly."
+            message: "Je ressens cette pression dans ma poitrine depuis une heure. J'ai du mal à respirer. J'ai un peu peur, honnêtement."
           }
         ]);
       } catch (error) {
         setMessages([
           {
             person: "patient",
-            message: "I've been feeling this pressure in my chest for the last hour. It makes it hard to catch my breath. I'm a bit scared, honestly."
+            message: "Je ressens cette pression dans ma poitrine depuis une heure. J'ai du mal à respirer. J'ai un peu peur, honnêtement."
           }
         ]);
       } finally {
@@ -167,7 +171,7 @@ export default function SimulationPage() {
       }
     };
     loadSession();
-  }, [isAuthLoading, user, token, role, sessionId, router]);
+  }, [isAuthLoading, user, token, sessionId]);
 
   // Auto-scroll
   useEffect(() => {
@@ -242,8 +246,20 @@ export default function SimulationPage() {
       <div className="flex h-screen w-full items-center justify-center bg-gray-50">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
-          <p className="text-gray-500 font-medium">Loading simulation...</p>
+          <p className="text-gray-500 font-medium">Chargement de la simulation...</p>
         </div>
+      </div>
+    );
+  }
+
+  // Si l'utilisateur n'est pas authentifié
+  if (!user || !token) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen gap-4 bg-gray-50">
+        <p className="text-slate-600">Vous devez être connecté pour accéder à cette simulation.</p>
+        <Link href="/">
+          <Button>Se connecter</Button>
+        </Link>
       </div>
     );
   }

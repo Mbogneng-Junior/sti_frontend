@@ -15,13 +15,19 @@ const MainLayout = ({
     const pathname = usePathname();
     const isExpertRoute = pathname?.startsWith('/expert');
     const isLearnRoute = pathname?.startsWith('/learn');
+    const isProfilingRoute = pathname?.startsWith('/profiling');
 
     // Pour les routes expert, on ne rend que les children (pas de sidebar Tuteur5GI)
     if (isExpertRoute) {
         return <>{children}</>;
     }
 
-    // Pour les routes learn, on ne rend que les children (elles ont leur propre layout avec sidebar)
+    // Pour les routes profiling, on ne rend que les children (page autonome)
+    if (isProfilingRoute) {
+        return <>{children}</>;
+    }
+
+    // Pour les routes learn, on ne rend que les children (LearnLayout gère la sidebar)
     if (isLearnRoute) {
         return <>{children}</>;
     }

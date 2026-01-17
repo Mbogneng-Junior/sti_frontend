@@ -1,6 +1,5 @@
 "use client";
 
-import { Footer } from "./footer";
 import { Header } from "./header";
 import { usePathname } from "next/navigation";
 
@@ -12,15 +11,21 @@ type Props = {
 const MarketingLayout = ({ children }: Props) => {
     const pathname = usePathname();
     const isExpertRoute = pathname?.startsWith('/expert');
-    const isLearnRoute = pathname?.startsWith('/learn');
+    const isProfilingRoute = pathname?.startsWith('/profiling');
+    const isHomePage = pathname === '/';
 
-    // Pour les routes expert, on ne rend que les children (pas de Header Tuteur5GI)
+    // Pour les routes expert, on ne rend que les children (pas de Header)
     if (isExpertRoute) {
         return <>{children}</>;
     }
 
-    // Pour les routes learn, on ne rend que les children (elles ont leur propre layout)
-    if (isLearnRoute) {
+    // Pour les routes profiling, on ne rend que les children (page autonome)
+    if (isProfilingRoute) {
+        return <>{children}</>;
+    }
+
+    // Pour la page d'accueil, on ne rend que les children (design intégré)
+    if (isHomePage) {
         return <>{children}</>;
     }
 
@@ -30,8 +35,6 @@ const MarketingLayout = ({ children }: Props) => {
             <main className="flex-1 flex flex-col items-center justify-center">
                 {children}
             </main>
-            <Footer />
-
         </div>
     );
 };

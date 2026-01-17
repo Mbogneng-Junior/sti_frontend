@@ -728,30 +728,77 @@ export const getDomaines = async () => {
     }
 };
 
-// Auth functions (à implémenter selon ton système d'auth)
-export const apprenantRegister = (data: any) => {
-    console.warn("Auth non implémentée");
-    return Promise.resolve({ status: "success" });
+// Auth functions - Mode Mock pour le développement
+// TODO: Remplacer par de vrais appels API quand le backend auth sera prêt
+
+export const apprenantRegister = async (data: { nom: string; email: string; password: string }) => {
+    // Simuler un délai réseau
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // En mode mock, on accepte toujours l'inscription
+    return {
+        status: "success",
+        message: "Inscription réussie"
+    };
 };
 
-export const apprenantLogin = (data: any) => {
-    console.warn("Auth non implémentée");
-    return Promise.resolve({ status: "success" });
+export const apprenantLogin = async (data: { email: string; password: string }) => {
+    // Simuler un délai réseau
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // En mode mock, on génère un token et des données utilisateur
+    const mockToken = `mock_token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    return {
+        status: "success",
+        token: mockToken,
+        apprenant: {
+            id: `apprenant_${Date.now()}`,
+            nom: data.email.split('@')[0] || "Apprenant",
+            email: data.email,
+        }
+    };
 };
 
-export const expertRegister = (data: any) => {
-    console.warn("Auth non implémentée");
-    return Promise.resolve({ status: "success" });
+export const expertRegister = async (data: {
+    nom: string;
+    email: string;
+    password: string;
+    matricule: string;
+    domaine_expertise_id: string;
+}) => {
+    // Simuler un délai réseau
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    return {
+        status: "success",
+        message: "Inscription réussie"
+    };
 };
 
-export const expertLogin = (data: any) => {
-    console.warn("Auth non implémentée");
-    return Promise.resolve({ status: "success" });
+export const expertLogin = async (data: { email: string; password: string }) => {
+    // Simuler un délai réseau
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const mockToken = `mock_token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    return {
+        status: "success",
+        token: mockToken,
+        expert: {
+            id: `expert_${Date.now()}`,
+            nom: data.email.split('@')[0] || "Expert",
+            email: data.email,
+            matricule: "EXP-001",
+            domaine: "Médecine Générale",
+        }
+    };
 };
 
-export const logout = (token: string) => {
-    console.warn("Auth non implémentée");
-    return Promise.resolve({ status: "success" });
+export const logout = async (token: string) => {
+    // Simuler un délai réseau
+    await new Promise(resolve => setTimeout(resolve, 200));
+    return { status: "success" };
 };
 
 // Session functions (à implémenter)
