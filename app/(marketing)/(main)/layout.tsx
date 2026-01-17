@@ -9,18 +9,24 @@ type Props = {
 };
 
 
-const MainLayout = ({ 
-    children 
+const MainLayout = ({
+    children
 }: Props) => {
     const pathname = usePathname();
     const isExpertRoute = pathname?.startsWith('/expert');
+    const isLearnRoute = pathname?.startsWith('/learn');
 
     // Pour les routes expert, on ne rend que les children (pas de sidebar Tuteur5GI)
     if (isExpertRoute) {
         return <>{children}</>;
     }
 
-    return ( 
+    // Pour les routes learn, on ne rend que les children (elles ont leur propre layout avec sidebar)
+    if (isLearnRoute) {
+        return <>{children}</>;
+    }
+
+    return (
         <>
             <MobileHeader />
             <Sidebar className="hidden lg:flex" />
@@ -28,7 +34,7 @@ const MainLayout = ({
                 <div className="max-w-[1056px] mx-auto pt-6 h-full">
                 { children}
                 </div>
-            </main>           
+            </main>
         </>
     );
 };

@@ -1,136 +1,283 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input"; // Assure-toi d'avoir ce composant shadcn ou utilise un input standard
-import { Search } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Sidebar } from "@/components/sidebar";
+import {
+  Plus,
+  ChevronRight,
+  Loader2
+} from "lucide-react";
 
-// Données fictives (Simulées)
-const COURSES = [
+// Donnees simulees pour le profil de competences
+const PROFICIENCY_DATA = [
   {
-    id: "paludisme",
-    title: "Le Paludisme",
-    description: "Comprendre, prévenir et traiter le paludisme.",
-    image: "/paludisme.png",
-    color: "bg-green-500", // Couleur de la bannière
-    tags: ["Infectieux", "Tropical"],
-  },
-  {
-    id: "diabete",
-    title: "Le Diabète",
-    description: "Gérer la glycémie et vivre avec le diabète.",
-    image: "/diabete.png",
-    color: "bg-blue-500",
-    tags: ["Chronique", "Nutrition"],
-  },
-  {
-    id: "avc",
-    title: "L'AVC",
-    description: "Reconnaître les signes et réagir vite.",
-    image: "/avc.png",
+    id: "clinical_knowledge",
+    label: "Clinical Knowledge",
+    value: 85,
     color: "bg-red-500",
-    tags: ["Urgence", "Cerveau"],
+    description: "Advanced mastery of core concepts"
   },
   {
-    id: "cancer-col",
-    title: "Cancer du Col",
-    description: "Prévention, dépistage et traitement.",
-    image: "/cervical_cancer.png",
-    color: "bg-pink-500",
-    tags: ["Cancer", "Femme"],
+    id: "differential_diagnosis",
+    label: "Differential Diagnosis",
+    value: 64,
+    color: "bg-blue-500",
+    description: "Intermediate level requires broader testing"
   },
+  {
+    id: "communication_skills",
+    label: "Communication Skills",
+    value: 72,
+    color: "bg-amber-500",
+    description: "Improving, focus on patient rapport"
+  },
+  {
+    id: "empathy_ethics",
+    label: "Empathy & Ethics",
+    value: 91,
+    color: "bg-green-500",
+    description: "Excellent patient-centric focus"
+  }
 ];
 
-export default function LearnDashboardPage() {
-  const [searchQuery, setSearchQuery] = useState("");
+// Donnees simulees pour les consultations
+const CONSULTATIONS_DATA = [
+  {
+    id: "1",
+    date: "Oct 24, 2023",
+    time: "2:30 PM",
+    patientName: "James Miller",
+    caseType: "Chronic Abdominal Pain",
+    score: 88,
+    avatar: "/avatars/patient1.png"
+  },
+  {
+    id: "2",
+    date: "Oct 21, 2023",
+    time: "09:15 AM",
+    patientName: "Sarah Connor",
+    caseType: "Acute Respiratory Distress",
+    score: 82,
+    avatar: "/avatars/patient2.png"
+  },
+  {
+    id: "3",
+    date: "Oct 18, 2023",
+    time: "11:00 AM",
+    patientName: "Robert Chen",
+    caseType: "Post-Surgical Followup",
+    score: 94,
+    avatar: "/avatars/patient3.png"
+  }
+];
 
-  // Filtrer les cours selon la recherche
-  const filteredCourses = COURSES.filter((course) =>
-    course.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+const ProficiencyBar = ({
+  label,
+  value,
+  color,
+  description
+}: {
+  label: string;
+  value: number;
+  color: string;
+  description: string;
+}) => (
+  <div className="space-y-2">
+    <div className="flex items-center justify-between">
+      <span className="text-sm font-medium text-gray-700">{label}</span>
+      <span className={`text-sm font-semibold ${
+        value >= 80 ? 'text-green-600' : value >= 60 ? 'text-amber-600' : 'text-red-600'
+      }`}>
+        {value}%
+      </span>
+    </div>
+    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+      <div
+        className={`h-full ${color} rounded-full transition-all duration-500`}
+        style={{ width: `${value}%` }}
+      />
+    </div>
+    <p className="text-xs text-gray-500">{description}</p>
+  </div>
+);
+
+export default function LearnDashboardPage() {
+  const router = useRouter();
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const [isStarting, setIsStarting] = useState(false);
+
+  const handleStartConsultation = () => {
+    setIsStarting(true);
+    // Rediriger vers la selection de domaine ou directement vers une simulation
+    router.push("/learn/paludisme");
+  };
+
+  const handleViewConsultation = (consultationId: string) => {
+    router.push(`/consultation/${consultationId}/feedback`);
+  };
+
+  if (isAuthLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
-    <div className="px-6 py-6 flex flex-col gap-y-8 max-w-[900px] mx-auto">
-      
-      {/* 1. En-tête et Barre de recherche */}
-      <div className="flex flex-col gap-y-4">
-        <h1 className="text-3xl font-extrabold text-neutral-700">
-          Que souhaitez-vous apprendre aujourd'hui ?
-        </h1>
-        
-        <div className="relative w-full max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-neutral-400" />
-          <Input 
-            placeholder="Rechercher un cours (ex: Paludisme)..."
-            className="pl-10 h-12 rounded-xl border-2 border-slate-200 bg-white focus-visible:ring-green-500"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
+    <div className="flex min-h-screen bg-gray-50">
+      {/* Sidebar */}
+      <Sidebar />
 
-        {/* Filtres rapides (Optionnel) */}
-        <div className="flex gap-2 mt-2">
-            <Button variant="outline" size="sm" className="rounded-full text-slate-600">Tout</Button>
-            <Button variant="ghost" size="sm" className="rounded-full text-slate-500">Maladies infectieuses</Button>
-            <Button variant="ghost" size="sm" className="rounded-full text-slate-500">Maladies chroniques</Button>
-        </div>
-      </div>
+      {/* Main Content */}
+      <div className="flex-1 ml-64">
+        {/* Header */}
+        <header className="bg-white border-b border-gray-100">
+          <div className="px-8 py-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+                <p className="text-sm text-gray-500 mt-1">
+                  Welcome back, {user?.nom?.split(' ')[0] || 'Alex'}. Here is your current clinical proficiency overview.
+                </p>
+              </div>
+              <Button
+                onClick={handleStartConsultation}
+                disabled={isStarting}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-full font-medium shadow-lg shadow-blue-600/25 transition-all duration-200 hover:shadow-xl hover:shadow-blue-600/30"
+              >
+                {isStarting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4 mr-2" />
+                )}
+                Start New Consultation
+              </Button>
+            </div>
+          </div>
+        </header>
 
-      {/* 2. Grille des cartes */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-10">
-        {filteredCourses.map((course) => (
-          <Link href={`/learn/${course.id}`} key={course.id}>
-            <div className="group border-2 border-slate-200 rounded-2xl overflow-hidden cursor-pointer hover:border-slate-300 hover:shadow-md transition-all bg-white flex flex-col h-full">
-              
-              {/* Image / Header de la carte */}
-              <div className={`${course.color} h-[100px] w-full flex items-center justify-center p-4 relative`}>
-                 <div className="bg-white/20 absolute inset-0 group-hover:bg-white/10 transition"/>
-                 <Image 
-                    src={course.image} 
-                    alt={course.title} 
-                    width={60} 
-                    height={60} 
-                    className="object-contain drop-shadow-md transform group-hover:scale-110 transition duration-300"
-                 />
+        {/* Content */}
+        <div className="px-8 py-6 space-y-6">
+          {/* Learner Profile & Proficiency */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <div className="w-1.5 h-5 bg-blue-600 rounded-full" />
+                Learner Profile & Proficiency
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+                {PROFICIENCY_DATA.map((item) => (
+                  <ProficiencyBar
+                    key={item.id}
+                    label={item.label}
+                    value={item.value}
+                    color={item.color}
+                    description={item.description}
+                  />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* My Consultations */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-semibold text-gray-900">
+                  My Consultations
+                </CardTitle>
+                <Link
+                  href="/consultations/history"
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition-colors"
+                >
+                  View All History
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent className="px-0">
+              {/* Table Header */}
+              <div className="grid grid-cols-4 gap-4 px-6 py-3 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <div>Date</div>
+                <div>Patient / Case</div>
+                <div>Score</div>
+                <div>Actions</div>
               </div>
 
-              {/* Contenu de la carte */}
-              <div className="p-5 flex flex-col justify-between flex-1">
-                <div>
-                    <h3 className="font-bold text-xl text-neutral-700 mb-2 group-hover:text-green-600 transition">
-                    {course.title}
-                    </h3>
-                    <p className="text-slate-500 text-sm leading-relaxed">
-                    {course.description}
-                    </p>
-                </div>
-
-                <div className="mt-6 flex items-center justify-between">
-                    {/* Tags */}
-                    <div className="flex gap-1">
-                        {course.tags.slice(0, 1).map(tag => (
-                            <span key={tag} className="text-[10px] uppercase font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-md">
-                                {tag}
-                            </span>
-                        ))}
+              {/* Table Body */}
+              <div className="divide-y divide-gray-50">
+                {CONSULTATIONS_DATA.map((consultation) => (
+                  <div
+                    key={consultation.id}
+                    className="grid grid-cols-4 gap-4 px-6 py-4 hover:bg-gray-50 transition-colors items-center"
+                  >
+                    {/* Date */}
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{consultation.date}</p>
+                      <p className="text-xs text-gray-500">{consultation.time}</p>
                     </div>
-                    <Button size="sm" variant="secondary" className="font-bold">
-                        Commencer
-                    </Button>
-                </div>
+
+                    {/* Patient / Case */}
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-9 w-9">
+                        <AvatarImage src={consultation.avatar} />
+                        <AvatarFallback className="bg-blue-100 text-blue-600 text-sm font-medium">
+                          {consultation.patientName.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{consultation.patientName}</p>
+                        <p className="text-xs text-gray-500">{consultation.caseType}</p>
+                      </div>
+                    </div>
+
+                    {/* Score */}
+                    <div>
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-semibold ${
+                        consultation.score >= 90
+                          ? 'bg-green-50 text-green-700'
+                          : consultation.score >= 80
+                            ? 'bg-blue-50 text-blue-700'
+                            : 'bg-amber-50 text-amber-700'
+                      }`}>
+                        {consultation.score} / 100
+                      </span>
+                    </div>
+
+                    {/* Actions */}
+                    <div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewConsultation(consultation.id)}
+                        className="text-gray-500 hover:text-blue-600 hover:bg-blue-50"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
 
-            </div>
-          </Link>
-        ))}
-
-        {filteredCourses.length === 0 && (
-            <div className="col-span-full text-center py-10 text-slate-500">
-                Aucun cours trouvé pour "{searchQuery}".
-            </div>
-        )}
+              {/* Load More */}
+              <div className="px-6 py-4 text-center border-t border-gray-100">
+                <button className="text-sm text-gray-500 hover:text-gray-700 font-medium transition-colors">
+                  + Load More History
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
