@@ -17,7 +17,7 @@ import { BookOpen, Eye, User, AlertCircle, Library } from "lucide-react";
 const CaseSchemaForPage = z.object({
   id_unique: z.string(),
   motif_consultation: z.string(),
-  donnees_personnelles: z.object({ age: z.number() })
+  donnees_patient: z.object({ age: z.number() })
 });
 type PublishedCaseData = z.infer<typeof CaseSchemaForPage>;
 
@@ -110,7 +110,7 @@ const ExpertLibraryPage = async () => {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <User className="h-4 w-4 text-muted-foreground" />
-                            <span>{caseItem.donnees_personnelles.age} ans</span>
+                            <span>{caseItem.donnees_patient?.age ?? "?"} ans</span>
                           </div>
                         </TableCell>
                         <TableCell>

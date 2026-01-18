@@ -3,11 +3,12 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -75,8 +76,8 @@ const ExpertPage = () => {
     try {
       const data = await getCases({
         keyword: keyword,
-        min_age: minAge,
-        max_age: maxAge,
+        min_age: minAge ? parseInt(minAge) : undefined,
+        max_age: maxAge ? parseInt(maxAge) : undefined,
         gender: gender,
         profession: profession,
         symptom: symptom,
@@ -295,7 +296,7 @@ const ExpertPage = () => {
                         <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <User className="h-4 w-4" />
-                            {cas.donnees_personnelles.age} ans, {cas.donnees_personnelles.sexe}
+                            {cas.donnees_patient.age} ans, {cas.donnees_patient.sexe}
                           </span>
                           <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">
                             ID: {cas.id_unique}
@@ -322,7 +323,10 @@ const ExpertPage = () => {
                       </div>
                     </div>
 
-                    <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                    <div className={cn(buttonVariants({ variant: "default", size: "sm" }), "opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0")}>
+                      Voir détails
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </div>
                   </div>
                 </CardContent>
               </Card>

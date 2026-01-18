@@ -11,7 +11,8 @@ import {
   BookOpen,
   Trophy,
   LogOut,
-  Loader2
+  Loader2,
+  MessageSquare,
 } from "lucide-react";
 
 type Props = {
@@ -20,6 +21,7 @@ type Props = {
 
 const learnerMenuItems = [
   { label: "Dashboard", href: "/learn", icon: LayoutDashboard },
+  { label: "Chat", href: "/chat", icon: MessageSquare },
   { label: "My Profile", href: "/profile", icon: User },
   { label: "Library", href: "/library", icon: BookOpen },
   { label: "Achievements", href: "/achievements", icon: Trophy },

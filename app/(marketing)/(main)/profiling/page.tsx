@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
+import * as api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -10,458 +12,338 @@ import {
   ArrowRight,
   ArrowLeft,
   CheckCircle2,
-  User,
-  Thermometer,
+  AlertCircle,
+  Loader2,
   Stethoscope,
-  MapPin,
-  Brain,
-  Zap,
-  Target,
-  TrendingUp,
-  Award,
-  Heart,
   Activity,
-  Clock
+  Brain,
+  Heart
 } from "lucide-react";
 
-// Donnees simulees pour le quiz
-const MOCK_QUIZ = [
-  {
-    id: 1,
-    difficulty: "Beginner",
-    difficultyColor: "bg-green-100 text-green-700",
-    case: {
-      title: "Fever and Chills",
-      patient: { age: 24, sex: "M", profession: "Student", region: "Douala" },
-      history: "Patient presenting with high fever (39.5C) for 2 days accompanied by intense chills and frontal headaches. Reports not sleeping under a mosquito net.",
-      vitals: { temp: "39.5C", bp: "120/80", pulse: "95 bpm" }
-    },
-    question: "What is the most likely diagnosis to consider first?",
-    options: [
-      { id: "a", text: "Acute gastroenteritis" },
-      { id: "b", text: "Simple malaria", correct: true },
-      { id: "c", text: "Cerebrospinal meningitis" },
-      { id: "d", text: "Typhoid fever" }
-    ]
-  },
-  {
-    id: 2,
-    difficulty: "Intermediate",
-    difficultyColor: "bg-amber-100 text-amber-700",
-    case: {
-      title: "Abdominal Pain and Fever",
-      patient: { age: 45, sex: "F", profession: "Merchant", region: "West" },
-      history: "Plateau fever for 1 week with diffuse abdominal pain and constipation. History of consuming untreated well water. Examination notes pulse-temperature dissociation.",
-      vitals: { temp: "39C", bp: "110/70", pulse: "80 bpm (Dissociated)" }
-    },
-    question: "Which complementary examination is most relevant to confirm this diagnosis?",
-    options: [
-      { id: "a", text: "Thick blood smear alone" },
-      { id: "b", text: "Abdominal ultrasound" },
-      { id: "c", text: "Blood culture and Widal-Felix", correct: true },
-      { id: "d", text: "Abdominopelvic CT scan" }
-    ]
-  },
-  {
-    id: 3,
-    difficulty: "Advanced",
-    difficultyColor: "bg-red-100 text-red-700",
-    case: {
-      title: "Altered Consciousness",
-      patient: { age: 68, sex: "M", profession: "Retired", region: "North" },
-      history: "Patient brought in for confusion and prostration. History of poorly controlled diabetes. Family reports rare urination. Examination reveals Kussmaul breathing.",
-      vitals: { temp: "37.2C", bp: "90/60", glucose: "4.5 g/L" }
-    },
-    question: "What is your main diagnostic hypothesis and immediate priority?",
-    options: [
-      { id: "a", text: "Severe malaria - neurological form" },
-      { id: "b", text: "Ischemic stroke" },
-      { id: "c", text: "Diabetic ketoacidosis - Rehydration and Insulin", correct: true },
-      { id: "d", text: "Hypoglycemic coma - Glucose administration" }
-    ]
-  }
-];
-
-// Composant pour une option de reponse
-const OptionButton = ({
-  letter,
-  text,
-  isSelected,
-  onClick
-}: {
-  letter: string;
-  text: string;
-  isSelected: boolean;
-  onClick: () => void;
-}) => (
-  <button
-    onClick={onClick}
-    className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-200 text-left group ${
-      isSelected
-        ? "border-blue-500 bg-blue-50 shadow-md"
-        : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
-    }`}
-  >
-    <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm transition-colors ${
-      isSelected
-        ? "bg-blue-500 text-white"
-        : "bg-gray-100 text-gray-600 group-hover:bg-gray-200"
-    }`}>
-      {letter}
-    </div>
-    <span className={`flex-1 font-medium ${isSelected ? "text-blue-900" : "text-gray-700"}`}>
-      {text}
-    </span>
-    {isSelected && (
-      <CheckCircle2 className="h-5 w-5 text-blue-500" />
-    )}
-  </button>
-);
-
-// Composant pour les indicateurs de progression
-const StepIndicator = ({
-  step,
-  currentStep,
-  total
-}: {
-  step: number;
-  currentStep: number;
-  total: number;
-}) => {
-  const isCompleted = step < currentStep;
-  const isCurrent = step === currentStep;
-
-  return (
-    <div className="flex items-center">
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
-        isCompleted
-          ? "bg-blue-500 text-white"
-          : isCurrent
-            ? "bg-blue-500 text-white ring-4 ring-blue-100"
-            : "bg-gray-200 text-gray-500"
-      }`}>
-        {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : step + 1}
-      </div>
-      {step < total - 1 && (
-        <div className={`w-12 h-1 mx-1 rounded-full transition-colors ${
-          isCompleted ? "bg-blue-500" : "bg-gray-200"
-        }`} />
-      )}
-    </div>
-  );
-};
+// Types
+import { ProfilingQuestion } from "@/lib/api";
 
 export default function ProfilingPage() {
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [isFinished, setIsFinished] = useState(false);
+  const { token } = useAuth();
+  
+  const [questions, setQuestions] = useState<ProfilingQuestion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // State for quiz execution
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<{ [qId: number]: number }>({}); // qId -> optionIndex
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [results, setResults] = useState<{ scores: any } | null>(null);
 
-  const currentQuestion = MOCK_QUIZ[currentStep];
-  const progress = ((currentStep + 1) / MOCK_QUIZ.length) * 100;
+  useEffect(() => {
+    async function loadQuestions() {
+      if (!token) return;
+      try {
+        const data = await api.getProfilingQuestions(token);
+        // Ensure data is array
+        if (Array.isArray(data)) {
+            setQuestions(data);
+        } else {
+            console.error("Data received is not an array", data);
+            setError("Format de données invalide reçu du serveur.");
+        }
+        setLoading(false);
+      } catch (err: any) {
+        console.error(err);
+        setError("Impossible de charger les questions de profiling.");
+        setLoading(false);
+      }
+    }
+    loadQuestions();
+  }, [token]);
 
-  const handleSelectAnswer = (value: string) => {
-    setAnswers({ ...answers, [currentStep]: value });
+  const handleOptionSelect = (optionIndex: number) => {
+    if (!questions.length) return;
+    const currentQ = questions[currentQuestionIndex];
+    setAnswers(prev => ({
+      ...prev,
+      [currentQ.id]: optionIndex
+    }));
   };
 
   const handleNext = () => {
-    if (currentStep < MOCK_QUIZ.length - 1) {
-      setCurrentStep(currentStep + 1);
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
     } else {
-      setIsFinished(true);
+      submitQuiz();
     }
   };
 
   const handlePrevious = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1);
     }
   };
 
-  const calculateScore = () => {
-    let score = 0;
-    MOCK_QUIZ.forEach((q, index) => {
-      const userAnswer = answers[index];
-      const correctOption = q.options.find(opt => opt.correct);
-      if (userAnswer === correctOption?.id) score++;
-    });
-    return score;
+  const submitQuiz = async () => {
+    if (!token) return;
+    setIsSubmitting(true);
+    try {
+      const response = await api.submitProfiling(answers, token);
+      setResults(response);
+    } catch (err) {
+      console.error(err);
+      setError("Erreur lors de la soumission des réponses.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const handleContinue = () => {
+      // Update local storage to reflect the change immediately without re-login
+      const storedUser = localStorage.getItem('authUser');
+      if (storedUser) {
+          const newUser = { ...JSON.parse(storedUser), est_profile: true };
+          localStorage.setItem('authUser', JSON.stringify(newUser));
+      }
+      window.location.href = '/learn'; 
+  };
+  
+  const handleSkip = async () => {
+      if (!token) return;
+      if (!window.confirm("Voulez-vous vraiment passer ce test ? Votre niveau sera initialisé à 'Débutant' partout.")) return;
+      
+      setIsSubmitting(true);
+      try {
+        // Send empty answers to initialize with 0/Beginner
+        const response = await api.submitProfiling({}, token);
+        setResults(response);
+      } catch (err) {
+        console.error(err);
+        setError("Erreur lors de l'initialisation du profil.");
+      } finally {
+        setIsSubmitting(false);
+      }
   };
 
-  // Ecran de resultat
-  if (isFinished) {
-    const score = calculateScore();
-    const percentage = Math.round((score / MOCK_QUIZ.length) * 100);
-    const level = score === 3 ? "Expert" : score === 2 ? "Intermediate" : "Beginner";
-    const levelColor = score === 3 ? "text-green-600" : score === 2 ? "text-amber-600" : "text-blue-600";
-
-    const competencies = [
-      { name: "Clinical Knowledge", score: score >= 2 ? 85 : 60, icon: Brain },
-      { name: "Diagnostic Reasoning", score: score >= 1 ? 75 : 45, icon: Target },
-      { name: "Critical Thinking", score: score === 3 ? 90 : 65, icon: Zap },
-      { name: "Medical Decision Making", score: percentage, icon: TrendingUp }
-    ];
-
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex items-center justify-center p-4">
-        <div className="max-w-2xl w-full space-y-6">
-          {/* Header Card */}
-          <Card className="border-0 shadow-xl overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 text-white text-center">
-              <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-                <Award className="h-10 w-10 text-white" />
-              </div>
-              <h1 className="text-2xl font-bold mb-2">Assessment Complete!</h1>
-              <p className="text-blue-100">Your clinical proficiency has been evaluated</p>
-            </div>
-
-            <CardContent className="p-8">
-              {/* Score Section */}
-              <div className="text-center mb-8">
-                <div className="inline-flex items-center justify-center w-32 h-32 rounded-full bg-gray-50 border-4 border-gray-100 mb-4">
-                  <div>
-                    <p className="text-4xl font-bold text-gray-900">{percentage}%</p>
-                    <p className="text-sm text-gray-500">Score</p>
-                  </div>
-                </div>
-                <p className="text-gray-600 mb-2">Your recommended level is</p>
-                <h2 className={`text-3xl font-bold ${levelColor}`}>{level}</h2>
-              </div>
-
-              {/* Competency Breakdown */}
-              <div className="space-y-4 mb-8">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                  Competency Breakdown
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  {competencies.map((comp) => (
-                    <div key={comp.name} className="bg-gray-50 rounded-xl p-4">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-white rounded-lg shadow-sm">
-                          <comp.icon className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <span className="text-sm font-medium text-gray-700">{comp.name}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Progress value={comp.score} className="flex-1 h-2" />
-                        <span className="text-sm font-semibold text-gray-900">{comp.score}%</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => {
-                    setIsFinished(false);
-                    setCurrentStep(0);
-                    setAnswers({});
-                  }}
-                >
-                  Retake Assessment
-                </Button>
-                <Button
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
-                  onClick={() => router.push("/learn")}
-                >
-                  Start Learning
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center space-y-4">
+            <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto" />
+            <p className="text-gray-500 font-medium">Chargement du test de positionnement...</p>
         </div>
       </div>
     );
   }
 
-  // Ecran du quiz
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-                <Brain className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h1 className="font-semibold text-gray-900">Skills Assessment</h1>
-                <p className="text-xs text-gray-500">Clinical Diagnostic Module</p>
-              </div>
-            </div>
+  if (error) {
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+            <Card className="w-full max-w-md border-red-200 shadow-lg">
+                <CardContent className="pt-6 text-center space-y-4">
+                    <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto">
+                        <AlertCircle className="w-8 h-8 text-red-600" />
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900">Une erreur est survenue</h2>
+                    <p className="text-gray-600">{error}</p>
+                    <Button onClick={() => window.location.reload()} variant="outline" className="w-full">
+                        Réessayer
+                    </Button>
+                </CardContent>
+            </Card>
+        </div>
+    );
+  }
 
-            {/* Step Indicators */}
-            <div className="hidden md:flex items-center">
-              {MOCK_QUIZ.map((_, index) => (
-                <StepIndicator
-                  key={index}
-                  step={index}
-                  currentStep={currentStep}
-                  total={MOCK_QUIZ.length}
+  // --- RESULT VIEW ---
+  if (results) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-2xl border-none shadow-xl overflow-hidden">
+          <div className="bg-green-600 p-8 text-center text-white">
+            <div className="bg-white/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
+                <CheckCircle2 className="w-10 h-10 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold mb-2">Profil Initialisé !</h1>
+            <p className="text-green-50">Merci docteur, nous avons calibré votre parcours.</p>
+          </div>
+          
+          <CardContent className="p-8 space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <ScoreCard 
+                    label="Anamnèse" 
+                    score={results.scores.anamnese} 
+                    icon={<Brain className="w-5 h-5 text-purple-600" />} 
+                    color="bg-purple-100" 
+                    barColor="bg-purple-600"
                 />
-              ))}
+                <ScoreCard 
+                    label="Diagnostic" 
+                    score={results.scores.diagnostic} 
+                    icon={<Stethoscope className="w-5 h-5 text-blue-600" />} 
+                    color="bg-blue-100" 
+                    barColor="bg-blue-600"
+                />
+                <ScoreCard 
+                    label="Traitement" 
+                    score={results.scores.traitement} 
+                    icon={<Activity className="w-5 h-5 text-emerald-600" />} 
+                    color="bg-emerald-100" 
+                    barColor="bg-emerald-600"
+                />
+                <ScoreCard 
+                    label="Relationnel" 
+                    score={results.scores.relationnel} 
+                    icon={<Heart className="w-5 h-5 text-rose-600" />} 
+                    color="bg-rose-100" 
+                    barColor="bg-rose-600"
+                />
             </div>
-
-            {/* Mobile Progress */}
-            <div className="md:hidden flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-600">
-                {currentStep + 1}/{MOCK_QUIZ.length}
-              </span>
+            
+            <div className="pt-4">
+                <Button onClick={handleContinue} className="w-full h-12 text-lg font-medium shadow-md transition-all hover:scale-[1.02]">
+                    Accéder à mon tableau de bord <ArrowRight className="ml-2 w-5 h-5" />
+                </Button>
             </div>
-          </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // --- QUIZ VIEW ---
+  const currentQ = questions[currentQuestionIndex];
+  // Guard clause if questions array is empty but loading is false (edge case)
+  if (!currentQ) return <div className="p-10 text-center">Aucune question disponible.</div>;
+
+  const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+  const isLastQuestion = currentQuestionIndex === questions.length - 1;
+  const hasSelectedOption = answers[currentQ.id] !== undefined;
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center py-10 px-4">
+      {/* Header */}
+      <div className="w-full max-w-4xl mb-8 flex items-center justify-between">
+        <div>
+            <h1 className="text-2xl font-bold text-slate-900">Évaluation Initiale</h1>
+            <p className="text-slate-500">Calibrage de votre niveau de compétence</p>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-5 gap-6">
-          {/* Left Column - Case Scenario */}
-          <div className="lg:col-span-3">
-            <Card className="border-0 shadow-lg overflow-hidden">
-              {/* Case Header */}
-              <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-6 text-white">
-                <div className="flex items-center justify-between mb-4">
-                  <Badge className={`${currentQuestion.difficultyColor} border-0`}>
-                    {currentQuestion.difficulty}
-                  </Badge>
-                  <Badge variant="outline" className="bg-white/10 text-white border-white/20">
-                    Case #{currentQuestion.id}
-                  </Badge>
-                </div>
-                <h2 className="text-xl font-bold">{currentQuestion.case.title}</h2>
-              </div>
-
-              <CardContent className="p-6 space-y-6">
-                {/* Patient Info */}
-                <div className="flex flex-wrap gap-3">
-                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
-                    <User className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm font-medium text-blue-900">
-                      {currentQuestion.case.patient.age} yrs, {currentQuestion.case.patient.sex}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">
-                    <Activity className="h-4 w-4 text-gray-600" />
-                    <span className="text-sm font-medium text-gray-700">
-                      {currentQuestion.case.patient.profession}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">
-                    <MapPin className="h-4 w-4 text-gray-600" />
-                    <span className="text-sm font-medium text-gray-700">
-                      {currentQuestion.case.patient.region}
-                    </span>
-                  </div>
-                </div>
-
-                {/* History */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Stethoscope className="h-5 w-5 text-gray-400" />
-                    <h3 className="font-semibold text-gray-900">Clinical History</h3>
-                  </div>
-                  <p className="text-gray-700 leading-relaxed text-lg bg-gray-50 p-4 rounded-xl border border-gray-100">
-                    {currentQuestion.case.history}
-                  </p>
-                </div>
-
-                {/* Vitals */}
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-3">Vital Signs</h3>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-red-50 p-4 rounded-xl border border-red-100">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Thermometer className="h-4 w-4 text-red-500" />
-                        <span className="text-xs font-medium text-red-600 uppercase">Temp</span>
-                      </div>
-                      <p className="text-lg font-bold text-red-900">{currentQuestion.case.vitals.temp}</p>
-                    </div>
-                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Heart className="h-4 w-4 text-blue-500" />
-                        <span className="text-xs font-medium text-blue-600 uppercase">BP</span>
-                      </div>
-                      <p className="text-lg font-bold text-blue-900">{currentQuestion.case.vitals.bp}</p>
-                    </div>
-                    <div className="bg-green-50 p-4 rounded-xl border border-green-100">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Activity className="h-4 w-4 text-green-500" />
-                        <span className="text-xs font-medium text-green-600 uppercase">Pulse</span>
-                      </div>
-                      <p className="text-lg font-bold text-green-900">
-                        {currentQuestion.case.vitals.pulse || currentQuestion.case.vitals.glucose}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right Column - Question */}
-          <div className="lg:col-span-2">
-            <Card className="border-0 shadow-lg sticky top-24">
-              <CardContent className="p-6">
-                {/* Question */}
-                <div className="mb-6">
-                  <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
-                    <Clock className="h-4 w-4" />
-                    Question {currentStep + 1} of {MOCK_QUIZ.length}
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 leading-relaxed">
-                    {currentQuestion.question}
-                  </h3>
-                </div>
-
-                {/* Options */}
-                <div className="space-y-3 mb-8">
-                  {currentQuestion.options.map((option, index) => (
-                    <OptionButton
-                      key={option.id}
-                      letter={String.fromCharCode(65 + index)}
-                      text={option.text}
-                      isSelected={answers[currentStep] === option.id}
-                      onClick={() => handleSelectAnswer(option.id)}
-                    />
-                  ))}
-                </div>
-
-                {/* Navigation */}
-                <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={handlePrevious}
-                    disabled={currentStep === 0}
-                    className="flex-1"
-                  >
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Previous
-                  </Button>
-                  <Button
-                    onClick={handleNext}
-                    disabled={!answers[currentStep]}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700"
-                  >
-                    {currentStep === MOCK_QUIZ.length - 1 ? "Finish" : "Next"}
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Progress Bar Mobile */}
-                <div className="mt-6 lg:hidden">
-                  <Progress value={progress} className="h-2" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <div className="text-right flex flex-col items-end gap-1">
+            <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleSkip} 
+                className="text-slate-400 hover:text-slate-600 mb-1 h-auto py-1 px-2"
+            >
+                Passer l'évaluation
+            </Button>
+            <div>
+                <span className="text-sm font-semibold text-slate-900">Question {currentQuestionIndex + 1}</span>
+                <span className="text-sm text-slate-400"> / {questions.length}</span>
+            </div>
         </div>
-      </main>
+      </div>
+
+      <div className="w-full max-w-4xl space-y-6">
+        {/* Progress Bar */}
+        <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+            <div 
+                className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out" 
+                style={{ width: `${progress}%` }}
+            ></div>
+        </div>
+
+        <Card className="border-none shadow-lg overflow-hidden">
+            <div className="bg-slate-900 p-6 text-white">
+                <div className="flex items-center gap-3 mb-4">
+                    <Badge variant="secondary" className="bg-blue-500/20 text-blue-200 hover:bg-blue-500/30 border-none">
+                        {currentQ.competence}
+                    </Badge>
+                </div>
+                <h3 className="text-lg font-medium leading-relaxed italic text-slate-300 mb-2">
+                    "{currentQ.situation}"
+                </h3>
+                <h2 className="text-xl md:text-2xl font-bold mt-4 leading-tight">
+                    {currentQ.question_text}
+                </h2>
+            </div>
+            
+            <CardContent className="p-6 md:p-8 bg-white">
+                <div className="space-y-4">
+                    {currentQ.options.map((option, idx) => (
+                        <button
+                            key={idx}
+                            onClick={() => handleOptionSelect(idx)}
+                            className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-200 text-left group
+                                ${answers[currentQ.id] === idx 
+                                    ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-100' 
+                                    : 'border-slate-100 hover:border-blue-200 hover:bg-slate-50'
+                                }
+                            `}
+                        >
+                            <div className={`
+                                w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-colors
+                                ${answers[currentQ.id] === idx 
+                                    ? 'bg-blue-600 border-blue-600 text-white' 
+                                    : 'bg-white border-slate-200 text-slate-400 group-hover:border-blue-400 group-hover:text-blue-500'
+                                }
+                            `}>
+                                {String.fromCharCode(65 + idx)}
+                            </div>
+                            <span className={`text-lg ${answers[currentQ.id] === idx ? 'text-blue-900 font-medium' : 'text-slate-700'}`}>
+                                {option.texte}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+
+                <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-100">
+                    <Button 
+                        variant="ghost" 
+                        onClick={handlePrevious}
+                        disabled={currentQuestionIndex === 0}
+                        className="text-slate-400 hover:text-slate-600"
+                    >
+                        <ArrowLeft className="mr-2 h-4 w-4" /> Précédent
+                    </Button>
+
+                    <Button 
+                        onClick={handleNext} 
+                        disabled={!hasSelectedOption || isSubmitting}
+                        className={`px-8 h-12 text-lg shadow-md transition-all ${
+                            hasSelectedOption 
+                                ? 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg hover:-translate-y-0.5' 
+                                : 'bg-slate-200 text-slate-400'
+                        }`}
+                    >
+                        {isSubmitting ? (
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : isLastQuestion ? (
+                            <>Terminer l'évaluation <CheckCircle2 className="ml-2 h-5 w-5" /></>
+                        ) : (
+                            <>Question suivante <ArrowRight className="ml-2 h-5 w-5" /></>
+                        )}
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+      </div>
     </div>
   );
+}
+
+function ScoreCard({ label, score, icon, color, barColor }: any) {
+    return (
+        <div className="bg-slate-50 rounded-xl p-5 border border-slate-100">
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${color}`}>
+                        {icon}
+                    </div>
+                    <span className="font-semibold text-slate-700">{label}</span>
+                </div>
+                <span className="font-bold text-slate-900">{Math.round(score)}%</span>
+            </div>
+            <Progress value={score} className="h-2" indicatorClassName={barColor} />
+            {/* Note: indicatorClassName might need to be supported by the Progress component or use style prop if not supported */}
+        </div>
+    )
 }

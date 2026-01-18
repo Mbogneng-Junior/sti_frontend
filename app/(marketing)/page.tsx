@@ -29,8 +29,16 @@ export default function MarketingPage() {
 
     useEffect(() => {
         if (user) {
-            const destination = role === 'expert' ? '/expert/dashboard' : '/learn';
-            router.push(destination);
+            if (role === 'expert') {
+                router.push('/expert/dashboard');
+            } else {
+                // Si c'est un apprenant, on vérifie s'il doit passer le profiling
+                if (user.est_profile === false) {
+                    router.push('/profiling');
+                } else {
+                    router.push('/learn');
+                }
+            }
         }
     }, [user, role, router]);
 

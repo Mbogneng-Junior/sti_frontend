@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,18 +13,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { validateCase, rejectCase, type CaseReviewData } from "@/lib/api";
+import { validateCase, rejectCase, getCaseForReview, type CaseReviewData } from "@/lib/api";
 import { 
-  Bell, HelpCircle, Share2, Printer, CheckCircle2, XCircle, 
-  Clock, User, Calendar, Activity, Shield, Droplets, Plane, 
-  Stethoscope, Pill, MapPin, AlertTriangle
+  User, Activity, Shield, Droplets, Plane, 
+  MapPin, Loader2, Clock, Calendar, Stethoscope, Pill, AlertTriangle
 } from "lucide-react";
 import { ExpertSidebar } from "@/components/expert-sidebar";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 type Props = {
-  caseData: CaseReviewData;
+  caseId: string;
 };
 
 type DecisionType = 'validate' | 'revise' | 'reject' | null;
@@ -50,14 +49,33 @@ const getLabStatusBadge = (status: string) => {
   }
 };
 
-export const CaseReviewClient = ({ caseData }: Props) => {
+export const CaseReviewClient = ({ caseId }: Props) => {
+  const [caseData, setCaseData] = useState<CaseReviewData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isValidating, setIsValidating] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [decision, setDecision] = useState<DecisionType>(null);
   const [notes, setNotes] = useState("");
   const router = useRouter();
 
+  useEffect(() => {
+    const loadCase = async () => {
+        try {
+            const data = await getCaseForReview(caseId);
+            setCaseData(data);
+        } catch (error) {
+            console.error("Erreur chargement cas:", error);
+            // Gérer l'erreur (ex: redirect ou message)
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    loadCase();
+  }, [caseId]);
+
   const handleSubmit = async () => {
+    if (!caseData) return;
+
     if (!decision) {
       alert("Veuillez sélectionner une décision");
       return;
@@ -75,6 +93,16 @@ export const CaseReviewClient = ({ caseData }: Props) => {
       catch (e) { alert(e); } finally { setIsRejecting(false); }
     }
   };
+
+  if (isLoading) {
+      return (
+          <div className="flex h-screen items-center justify-center bg-gray-50">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          </div>
+      );
+  }
+
+  if (!caseData) return <div>Erreur de chargement du cas.</div>;
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -195,7 +223,7 @@ export const CaseReviewClient = ({ caseData }: Props) => {
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line font-medium">
-                        "{caseData.title}"
+                        &quot;{caseData.title}&quot;
                       </p>
                       <p className="text-sm text-gray-600 mt-2">
                         {caseData.patientHistory}

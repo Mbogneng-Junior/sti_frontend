@@ -1,34 +1,58 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardStatCard } from "@/components/expert/dashboard-stat-card";
 import { ClinicalCasesTable } from "@/components/expert/clinical-cases-table";
-import { type DashboardData } from "@/lib/api";
+import { getExpertDashboardData, type DashboardData } from "@/lib/api";
 import { ExpertSidebar } from "@/components/expert-sidebar";
 import {
   FileText,
   Clock,
   CheckCircle2,
   Bell,
-  HelpCircle
+  HelpCircle,
+  XCircle,
+  Loader2 
 } from "lucide-react";
 
-type Props = {
-  initialData: DashboardData;
-};
-
-export const DashboardClient = ({ initialData }: Props) => {
-  const [data] = useState(initialData);
+export const DashboardClient = () => {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+
+  // Load data on mount
+  useEffect(() => {
+    const loadData = async () => {
+        try {
+            const dashboardData = await getExpertDashboardData();
+            setData(dashboardData);
+        } catch (error) {
+            console.error("Failed to load dashboard data", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    loadData();
+  }, []);
 
   const handleReview = (caseId: string) => {
     router.push(`/expert/editor/${caseId}`);
   };
 
   const handleViewDetails = (caseId: string) => {
-    router.push(`/expert/${caseId}`);
+    router.push(`/expert/editor/${caseId}`);
   };
+
+  if (isLoading) {
+      return (
+          <div className="flex min-h-screen bg-gray-50 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          </div>
+      );
+  }
+
+  if (!data) return null;
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -84,6 +108,13 @@ export const DashboardClient = ({ initialData }: Props) => {
               iconColor="text-green-600"
               iconBgColor="bg-green-100"
               trend={data.kpis.trendValidated}
+            />
+            <DashboardStatCard
+              title="Cas rejetés"
+              value={data.kpis.rejectedCases.toLocaleString()}
+              icon={XCircle}
+              iconColor="text-red-600"
+              iconBgColor="bg-red-100"
             />
           </div>
 
