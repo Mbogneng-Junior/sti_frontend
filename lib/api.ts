@@ -4,6 +4,97 @@
 const API_BASE_URL = "http://localhost:8000";
 
 /**
+ * Gets authorization headers with token if available
+ */
+const getAuthHeaders = (): HeadersInit => {
+    const headers: HeadersInit = {
+        "Content-Type": "application/json",
+    };
+    
+    // Check if we are in the browser
+    if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+            headers["Authorization"] = `Token ${token}`;
+        }
+    }
+    
+    return headers;
+};
+
+// --- Student Dashboard Types ---
+export interface ProficiencyItem {
+  id: string;
+  label: string;
+  value: number;
+  color: string;
+  bgColor: string;
+  description: string;
+}
+
+export interface StudentStats {
+  cas_completes: number;
+  score_moyen: number;
+  temps_etude: number;
+  jours_consecutifs: number;
+}
+
+export interface StudentDashboardData {
+  global_stats: StudentStats;
+  proficiency_data: ProficiencyItem[];
+}
+
+export const getStudentDashboardStats = async (): Promise<StudentDashboardData> => {
+  const res = await fetch(`${API_BASE_URL}/api/v1/apprenant/dashboard/stats/`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error("Erreur chargement dashboard");
+  return res.json();
+};
+
+export interface Badge {
+  id: number;
+  nom: string;
+  description: string;
+  icon?: string;
+}
+
+export interface CompetenceLevel {
+  id: number;
+  domaine_nom: string;
+  niveau_actuel: string;
+  score_anamnese: number;
+  score_diagnostic: number;
+  score_traitement: number;
+  score_relationnel: number;
+  progression_globale: number;
+}
+
+export interface FullProfileData {
+  apprenant: {
+    id: string;
+    nom: string;
+    email: string;
+    date_inscription: string;
+  };
+  profil: {
+    xp_total: number;
+    lacunes_identifiees: string[];
+    badges: Badge[];
+    est_profile: boolean;
+  };
+  competences: CompetenceLevel[];
+}
+
+export const getStudentFullProfile = async (): Promise<FullProfileData> => {
+   const res = await fetch(`${API_BASE_URL}/api/v1/apprenant/dashboard/full_profile/`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error("Erreur chargement profil");
+  return res.json();
+};
+
+/**
  * Gère les réponses de l'API de manière robuste.
  */
 const handleApiResponse = async (response: Response) => {
@@ -126,8 +217,9 @@ type BackendDonneesPersonnelles = {
 
 type BackendClinicalCase = {
     id_unique: string;
-    hash_authentification: string;
-    status: "en_attente" | "valide" | "rejete";
+    hash_authentification?: string;
+    statut: string; // "en_attente" | "valide" | "rejete" | "PUBLIE" etc.
+    // status: "en_attente" | "valide" | "rejete"; // Changed to 'statut' due to backend field name
     date_creation: string | null;
     date_validation: string | null;
     validateur_id: string | null;
@@ -137,7 +229,7 @@ type BackendClinicalCase = {
     specialite_medicale: string | null;
     objectifs_pedagogiques: string[];
     motif_consultation: string;
-    donnees_personnelles: BackendDonneesPersonnelles;
+    donnees_patient: BackendDonneesPersonnelles;
     mode_de_vie: BackendModeDeVie;
     antecedents_medicaux: BackendAntecedents;
     symptomes: BackendSymptom[];
@@ -182,6 +274,7 @@ export type ExpertCaseData = {
     domain: string;
     extractionDate: string;
     status: CaseStatus;
+    difficulty: "Débutant" | "Intermédiaire" | "Avancé" | "Expert" | "Non défini";
 };
 
 export type DashboardData = {
@@ -279,9 +372,16 @@ export type AvailableFilters = {
  */
 const mapStatus = (backendStatus: string): CaseStatus => {
     switch (backendStatus) {
-        case "en_attente": return "attente";
-        case "valide": return "validé";
-        case "rejete": return "rejeté";
+        case "en_attente": // Legacy
+        case "EN_REVISION": 
+        case "BROUILLON_IA": return "attente";
+        
+        case "valide": // Legacy
+        case "PUBLIE": return "validé";
+        
+        case "rejete": // Legacy
+        case "REJETE": return "rejeté";
+        
         default: return "attente";
     }
 };
@@ -291,10 +391,10 @@ const mapStatus = (backendStatus: string): CaseStatus => {
  */
 const mapStatusToBackend = (frontendStatus: CaseStatus): string => {
     switch (frontendStatus) {
-        case "attente": return "en_attente";
-        case "validé": return "valide";
-        case "rejeté": return "rejete";
-        default: return "en_attente";
+        case "attente": return "EN_REVISION";
+        case "validé": return "PUBLIE";
+        case "rejeté": return "REJETE";
+        default: return "EN_REVISION";
     }
 };
 
@@ -308,14 +408,26 @@ const mapGender = (backendGender: string): "Male" | "Female" => {
 /**
  * Mappe un cas backend vers le format tableau dashboard
  */
+const mapDifficulty = (level: string | null): "Débutant" | "Intermédiaire" | "Avancé" | "Expert" | "Non défini" => {
+    if (!level) return "Non défini";
+    switch(level) {
+        case "DEBUTANT": return "Débutant";
+        case "INTERMEDIAIRE": return "Intermédiaire";
+        case "AVANCE": return "Avancé";
+        case "EXPERT": return "Expert";
+        default: return "Non défini";
+    }
+}
+
 const mapCaseToExpertData = (backendCase: BackendClinicalCase): ExpertCaseData => {
     return {
         id: backendCase.id_unique,
-        patientAge: backendCase.donnees_personnelles.age,
-        gender: mapGender(backendCase.donnees_personnelles.sexe),
+        patientAge: backendCase.donnees_patient.age,
+        gender: mapGender(backendCase.donnees_patient.sexe),
         domain: backendCase.pathologie_principale || "Non défini",
         extractionDate: backendCase.date_creation || new Date().toISOString(),
-        status: mapStatus(backendCase.status),
+        status: mapStatus(backendCase.statut),
+        difficulty: mapDifficulty(backendCase.niveau_difficulte),
     };
 };
 
@@ -405,17 +517,17 @@ const mapCaseToReviewData = (backendCase: BackendClinicalCase): CaseReviewData =
     return {
         id: backendCase.id_unique,
         title: backendCase.pathologie_principale || backendCase.motif_consultation,
-        status: mapStatus(backendCase.status),
+        status: mapStatus(backendCase.statut),
         createdDate: backendCase.date_creation || new Date().toISOString(),
         patientInfo: {
-            gender: mapGender(backendCase.donnees_personnelles.sexe),
-            age: backendCase.donnees_personnelles.age,
-            bmi: backendCase.donnees_personnelles.groupe_sanguin || "N/A",
+            gender: mapGender(backendCase.donnees_patient.sexe),
+            age: backendCase.donnees_patient.age,
+            bmi: backendCase.donnees_patient.groupe_sanguin || "N/A",
             patientId: `#${backendCase.id_unique.split('-')[1] || backendCase.id_unique}`,
-            profession: backendCase.donnees_personnelles.profession,
-            etatCivil: backendCase.donnees_personnelles.etat_civil,
-            groupeSanguin: backendCase.donnees_personnelles.groupe_sanguin,
-            region: backendCase.donnees_personnelles.region_origine,
+            profession: backendCase.donnees_patient.profession,
+            etatCivil: backendCase.donnees_patient.etat_civil,
+            groupeSanguin: backendCase.donnees_patient.groupe_sanguin,
+            region: backendCase.donnees_patient.region_origine,
         },
         patientHistory,
         pastMedicalHistory,
@@ -494,16 +606,24 @@ export const getCases = async (filters?: {
         if (filters.limit) params.append('limit', filters.limit.toString());
     }
     
-    const url = `${API_BASE_URL}/api/cases${params.toString() ? '?' + params.toString() : ''}`;
-    const response = await fetch(url);
-    return handleApiResponse(response);
+    // CHANGE: Adjusted endpoint to match DRF router path
+    const url = `${API_BASE_URL}/api/v1/expert/cas-cliniques/${params.toString() ? '?' + params.toString() : ''}`;
+    const response = await fetch(url, {
+        headers: getAuthHeaders()
+    });
+    const data = await handleApiResponse(response);
+    // Handle DRF pagination response structure if present
+    return Array.isArray(data) ? data : (data.results || []);
 };
 
 /**
  * Récupère un cas par son ID
  */
 export const getCaseById = async (id: string): Promise<BackendClinicalCase> => {
-    const response = await fetch(`${API_BASE_URL}/api/cases/${id}`);
+    // CHANGE: Adjusted endpoint to match DRF router path
+    const response = await fetch(`${API_BASE_URL}/api/v1/expert/cas-cliniques/${id}/`, {
+        headers: getAuthHeaders()
+    });
     return handleApiResponse(response);
 };
 
@@ -511,7 +631,10 @@ export const getCaseById = async (id: string): Promise<BackendClinicalCase> => {
  * Récupère les statistiques
  */
 export const getStats = async (): Promise<BackendStats> => {
-    const response = await fetch(`${API_BASE_URL}/api/stats`);
+    // CHANGE: Adjusted endpoint to match DRF router path (action)
+    const response = await fetch(`${API_BASE_URL}/api/v1/expert/cas-cliniques/stats/`, {
+        headers: getAuthHeaders()
+    });
     return handleApiResponse(response);
 };
 
@@ -519,7 +642,10 @@ export const getStats = async (): Promise<BackendStats> => {
  * Récupère les filtres disponibles
  */
 export const getFilters = async (): Promise<AvailableFilters> => {
-    const response = await fetch(`${API_BASE_URL}/api/filters`);
+    // CHANGE: Adjusted endpoint to match DRF router path (action)
+    const response = await fetch(`${API_BASE_URL}/api/v1/expert/cas-cliniques/filters/`, {
+        headers: getAuthHeaders()
+    });
     return handleApiResponse(response);
 };
 
@@ -532,13 +658,17 @@ export const updateCaseStatus = async (
     commentaire?: string,
     validateurId?: string
 ): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/api/cases/${caseId}/status`, {
+    // CHANGE: Adjusted endpoint to match DRF router path (PATCH on resource)
+    const headers = getAuthHeaders() as Record<string, string>;
+    const response = await fetch(`${API_BASE_URL}/api/v1/expert/cas-cliniques/${caseId}/`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            ...headers,
+            'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
-            new_status: mapStatusToBackend(newStatus),
-            commentaire,
-            validateur_id: validateurId,
+            statut: mapStatusToBackend(newStatus), // Field name adjusted to 'statut'
+            // Add other fields if supported by serializer
         }),
     });
     return handleApiResponse(response);
@@ -594,9 +724,10 @@ export const getExpertDashboardData = async (): Promise<DashboardData> => {
         const mappedCases = cases.map(mapCaseToExpertData);
 
         // Extraire les KPIs des stats
-        const pendingCases = stats.par_status?.en_attente || 0;
-        const validatedCases = stats.par_status?.valide || 0;
-        const rejectedCases = stats.par_status?.rejete || 0;
+        // Note: Backend keys match Django TextChoices (PUBLIE, EN_REVISION, REJETE, BROUILLON_IA)
+        const pendingCases = (stats.par_status?.EN_REVISION || 0) + (stats.par_status?.BROUILLON_IA || 0) + (stats.par_status?.en_attente || 0);
+        const validatedCases = (stats.par_status?.PUBLIE || 0) + (stats.par_status?.valide || 0); // Include legacy 'valide' just in case
+        const rejectedCases = (stats.par_status?.REJETE || 0) + (stats.par_status?.rejete || 0);
 
         return {
             kpis: {
@@ -745,8 +876,18 @@ export const updateExpertProfile = async (data: any) => {
 
 export const getDomaines = async () => {
     try {
-        const filters = await getFilters();
-        return filters.pathologies.map((p, index) => ({ id: index + 1, nom: p }));
+        const response = await fetch(`${API_BASE_URL}/api/v1/expert/domaines/`, {
+            headers: getAuthHeaders()
+        });
+        const data = await handleApiResponse(response);
+        // L'API DRF retourne soit une liste directe, soit un objet paginé { results: [...] }
+        // Si c'est paginé, on prend .results, sinon on prend la réponse telle quelle.
+        const results = Array.isArray(data) ? data : (data.results || []);
+        
+        return results.map((d: any) => ({
+            id: d.id,
+            nom: d.nom
+        }));
     } catch (error) {
         console.error("Erreur getDomaines:", error);
         return [];
@@ -757,32 +898,21 @@ export const getDomaines = async () => {
 // TODO: Remplacer par de vrais appels API quand le backend auth sera prêt
 
 export const apprenantRegister = async (data: { nom: string; email: string; password: string }) => {
-    // Simuler un délai réseau
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // En mode mock, on accepte toujours l'inscription
-    return {
-        status: "success",
-        message: "Inscription réussie"
-    };
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/register/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+    });
+    return await handleApiResponse(response);
 };
 
 export const apprenantLogin = async (data: { email: string; password: string }) => {
-    // Simuler un délai réseau
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // En mode mock, on génère un token et des données utilisateur
-    const mockToken = `mock_token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    return {
-        status: "success",
-        token: mockToken,
-        apprenant: {
-            id: `apprenant_${Date.now()}`,
-            nom: data.email.split('@')[0] || "Apprenant",
-            email: data.email,
-        }
-    };
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/login/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+    });
+    return await handleApiResponse(response);
 };
 
 export const expertRegister = async (data: {
@@ -792,32 +922,21 @@ export const expertRegister = async (data: {
     matricule: string;
     domaine_expertise_id: string;
 }) => {
-    // Simuler un délai réseau
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    return {
-        status: "success",
-        message: "Inscription réussie"
-    };
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/expert/register/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+    });
+    return await handleApiResponse(response);
 };
 
 export const expertLogin = async (data: { email: string; password: string }) => {
-    // Simuler un délai réseau
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const mockToken = `mock_token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    return {
-        status: "success",
-        token: mockToken,
-        expert: {
-            id: `expert_${Date.now()}`,
-            nom: data.email.split('@')[0] || "Expert",
-            email: data.email,
-            matricule: "EXP-001",
-            domaine: "Médecine Générale",
-        }
-    };
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/expert/login/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+    });
+    return await handleApiResponse(response);
 };
 
 export const logout = async (token: string) => {
@@ -851,3 +970,124 @@ export const deleteSession = async (sessionId: string, token: string) => {
     console.warn("Session non implémentée");
     return { status: "success" };
 };
+
+// ============================================================
+// API PROFILING (Module Apprenant)
+// ============================================================
+
+export type ProfilingQuestion = {
+    id: number;
+    competence: string;
+    situation: string;
+    question_text: string;
+    options: { texte: string; score: number; feedback: string }[];
+};
+
+export const getProfilingQuestions = async (token: string): Promise<ProfilingQuestion[]> => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/apprenant/questions-profiling/`, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Token ${token}`,
+        },
+    });
+    return await handleApiResponse(response);
+};
+
+export const submitProfiling = async (reponses: { [questionId: number]: number }, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/apprenant/questions-profiling/submit/`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Token ${token}`,
+        },
+        body: JSON.stringify({ reponses }),
+    });
+    return await handleApiResponse(response);
+};
+
+// --- Tutor / Chat API ---
+
+export interface TutorSessionStartResponse {
+    session_id: string;
+    message: string;
+}
+
+export interface EvaluationData {
+  competence: string;
+  question: string;
+  options: string[];
+  correct_answer: string;
+  explanation: string;
+}
+
+export interface TutorInteractionResponse {
+    status: string;
+    latest_exchange: {
+        patient: string;
+        tutor: string;
+    };
+    chat_history: {
+        person: "doctor" | "patient";
+        message: string;
+    }[];
+     student_profile: any;
+     formative_evaluation?: EvaluationData;
+}
+
+export const startTutorSession = async (emailApprenant: string, domaineNom: string): Promise<TutorSessionStartResponse> => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/tuteur/session/start/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+            email_apprenant: emailApprenant,
+            domaine_nom: domaineNom
+        }),
+    });
+    return handleApiResponse(response);
+}
+
+export const sendTutorMessage = async (sessionId: string, messageEtudiant: string): Promise<TutorInteractionResponse> => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/tuteur/session/analyser/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+            session_id: sessionId,
+            reponse_etudiant: messageEtudiant
+        }),
+    });
+    return handleApiResponse(response);
+}
+
+export const getTutorSessionState = async (sessionId: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/tuteur/session/${sessionId}/state/`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+    });
+    return handleApiResponse(response);
+}
+
+export interface SummativeData {
+  score_global: number;
+  score_communication: number;
+  score_anamnese: number;
+  score_diagnostic: number;
+  score_prise_en_charge: number;
+  difficultes_identifiees: string[];
+  points_forts: string[];
+  feedback_global: string;
+}
+
+export const endTutorSession = async (sessionId: string): Promise<SummativeData> => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/tuteur/session/end/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+            session_id: sessionId
+        }),
+    });
+    return handleApiResponse(response);
+}
+
+
+

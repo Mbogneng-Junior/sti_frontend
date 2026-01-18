@@ -56,6 +56,8 @@ export const ClinicalCasesTable = ({ cases, onReview, onViewDetails }: Props) =>
   const [ageFilter, setAgeFilter] = useState<string>("all");
   const [genderFilter, setGenderFilter] = useState<string>("all");
   const [domainFilter, setDomainFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 7;
 
@@ -86,9 +88,17 @@ export const ClinicalCasesTable = ({ cases, onReview, onViewDetails }: Props) =>
         domainFilter === "all" ||
         caseItem.domain === domainFilter;
 
-      return matchesSearch && matchesAge && matchesGender && matchesDomain;
+      const matchesStatus =
+        statusFilter === "all" ||
+        caseItem.status === statusFilter;
+
+      const matchesDifficulty =
+        difficultyFilter === "all" ||
+        caseItem.difficulty === difficultyFilter;
+
+      return matchesSearch && matchesAge && matchesGender && matchesDomain && matchesStatus && matchesDifficulty;
     });
-  }, [cases, searchQuery, ageFilter, genderFilter, domainFilter]);
+  }, [cases, searchQuery, ageFilter, genderFilter, domainFilter, statusFilter, difficultyFilter]);
 
   const totalPages = Math.ceil(filteredCases.length / itemsPerPage);
   const paginatedCases = filteredCases.slice(
@@ -101,6 +111,8 @@ export const ClinicalCasesTable = ({ cases, onReview, onViewDetails }: Props) =>
     setAgeFilter("all");
     setGenderFilter("all");
     setDomainFilter("all");
+    setStatusFilter("all");
+    setDifficultyFilter("all");
     setCurrentPage(1);
   };
 
@@ -158,6 +170,31 @@ export const ClinicalCasesTable = ({ cases, onReview, onViewDetails }: Props) =>
                   {domain}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Statut" />
+            </SelectTrigger>
+            <SelectContent className="z-50">
+              <SelectItem value="all">Tous les statuts</SelectItem>
+              <SelectItem value="attente">En attente</SelectItem>
+              <SelectItem value="validé">Validé</SelectItem>
+              <SelectItem value="rejeté">Rejeté</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Difficulté" />
+            </SelectTrigger>
+            <SelectContent className="z-50">
+              <SelectItem value="all">Toutes difficultés</SelectItem>
+              <SelectItem value="Débutant">Débutant</SelectItem>
+              <SelectItem value="Intermédiaire">Intermédiaire</SelectItem>
+              <SelectItem value="Avancé">Avancé</SelectItem>
+              <SelectItem value="Expert">Expert</SelectItem>
             </SelectContent>
           </Select>
 

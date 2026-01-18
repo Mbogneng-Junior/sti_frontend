@@ -1,25 +1,46 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ExpertSidebar } from "@/components/expert-sidebar";
 import { ClinicalCasesTable } from "@/components/expert/clinical-cases-table";
-import { Bell, HelpCircle } from "lucide-react";
-import type { ExpertCaseData } from "@/lib/api";
+import { Bell, HelpCircle, Loader2 } from "lucide-react";
+import { getExpertDashboardData, type ExpertCaseData } from "@/lib/api";
 
-type Props = {
-  cases: ExpertCaseData[];
-};
-
-export const RejectedCasesClient = ({ cases }: Props) => {
+export const RejectedCasesClient = () => {
+  const [cases, setCases] = useState<ExpertCaseData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+
+  useEffect(() => {
+    const loadCases = async () => {
+        try {
+            const data = await getExpertDashboardData();
+            setCases(data.cases.filter(c => c.status === "rejeté"));
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    loadCases();
+  }, []);
 
   const handleReview = (caseId: string) => {
     router.push(`/expert/editor/${caseId}`);
   };
 
   const handleViewDetails = (caseId: string) => {
-    router.push(`/expert/${caseId}`);
+    router.push(`/expert/editor/${caseId}`);
   };
+
+  if (isLoading) {
+      return (
+          <div className="flex min-h-screen bg-gray-50 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          </div>
+      );
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-50">

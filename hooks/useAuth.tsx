@@ -12,6 +12,7 @@ interface UserData {
   email: string;
   matricule?: string; // Optionnel pour les experts
   domaine?: string; // Optionnel pour les experts
+  est_profile?: boolean; // Pour les apprenants
 }
 
 interface AuthContextType {
@@ -36,6 +37,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
 
   // Au premier chargement, on vérifie si l'utilisateur est déjà connecté (via localStorage)
+  // ET on applique la redirection de profiling si nécessaire (protection de route simple)
   useEffect(() => {
     try {
       const storedToken = localStorage.getItem('authToken');
@@ -43,9 +45,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedRole = localStorage.getItem('authRole') as 'apprenant' | 'expert' | null;
 
       if (storedToken && storedUser && storedRole) {
+        const parsedUser = JSON.parse(storedUser);
         setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+        setUser(parsedUser);
         setRole(storedRole);
+        
+        // Logique de redirection forcée si 'est_profile' est false
+        // On vérifie qu'on n'est PAS DÉJÀ sur la page de profiling pour éviter une boucle
+        if (storedRole === 'apprenant' && parsedUser.est_profile === false) {
+             const currentPath = window.location.pathname;
+             if (currentPath !== '/profiling') {
+                 console.log("Utilisateur non profilé détecté, redirection vers /profiling");
+                 router.push('/profiling');
+             }
+        }
       }
     } catch (error) {
       console.error("Erreur de chargement depuis le localStorage", error);
@@ -54,7 +67,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, []); // Le tableau de dépendance vide [] fait que cela ne tourne qu'au montage initial
+
 
   const handleLoginSuccess = (responseData: any, userRole: 'apprenant' | 'expert') => {
     const userData = userRole === 'apprenant' ? responseData.apprenant : responseData.expert;
@@ -68,8 +82,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('authUser', JSON.stringify(userData));
     localStorage.setItem('authRole', userRole);
 
-    // Redirection après connexion
-    router.push(userRole === 'apprenant' ? '/learn' : '/expert/dashboard');
+    // Simplification de la logique de redirection
+    if (userRole === 'apprenant') {
+      if (userData.est_profile === false) {
+          router.push('/profiling');
+      } else {
+          router.push('/learn');
+      }
+    } else {
+      router.push('/expert/dashboard');
+    }
   };
 
   const login = async (email: string, password: string, userRole: 'apprenant' | 'expert') => {
@@ -121,11 +143,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Le Hook personnalisé pour utiliser le contexte facilement
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth doit être utilisé à l\'intérieur d\'un AuthProvider');
-  }
-  return context;
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+        throw new Error('useAuth must be used within an AuthProvider');
+    }
+    return context;
 };

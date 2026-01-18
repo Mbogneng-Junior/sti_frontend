@@ -24,9 +24,11 @@ import {
   AlertCircle,
   CheckCircle2,
   Eye,
-  EyeOff
+  EyeOff,
+  Check,
+  X
 } from "lucide-react";
-import { getCaseById } from "@/lib/api";
+import { getCaseById, updateCaseStatus, type CaseStatus } from "@/lib/api";
 
 type CasClinique = Awaited<ReturnType<typeof getCaseById>>;
 
@@ -78,6 +80,7 @@ const CaseDetailPage = () => {
 
   const [cas, setCas] = useState<CasClinique | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [isChallengeMode, setIsChallengeMode] = useState(false);
@@ -113,6 +116,21 @@ const CaseDetailPage = () => {
   const exitChallenge = () => {
     setIsChallengeMode(false);
     setShowResults(false);
+  };
+
+  const handleStatusChange = async (newStatus: CaseStatus) => {
+    if (!cas) return;
+    setIsUpdating(true);
+    try {
+      await updateCaseStatus(cas.id_unique, newStatus);
+      const updatedCas = await getCaseById(cas.id_unique);
+      setCas(updatedCas);
+    } catch (e: any) {
+      console.error("Failed to update status", e);
+      alert("Erreur lors de la mise à jour du statut: " + e.message);
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   if (isLoading) {
@@ -187,15 +205,35 @@ const CaseDetailPage = () => {
                   {cas.id_unique}
                 </Badge>
                 <Badge variant="secondary" className="text-xs">
-                  Hash: {cas.hash_authentification.substring(0, 12)}...
+                  Hash: {cas.hash_authentification ? cas.hash_authentification.substring(0, 12) + "..." : "N/A"}
                 </Badge>
               </div>
             </div>
             {!isChallengeMode && (
-              <Button onClick={startChallenge} className="gap-2">
-                <Sparkles className="h-4 w-4" />
-                Lancer le Defi Expert
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                    variant="outline" 
+                    className="gap-2 text-green-600 border-green-200 hover:bg-green-50"
+                    onClick={() => handleStatusChange("validé")}
+                    disabled={isUpdating || cas.statut === "PUBLIE"}
+                >
+                  <Check className="h-4 w-4" />
+                  Valider
+                </Button>
+                <Button 
+                    variant="outline" 
+                    className="gap-2 text-red-600 border-red-200 hover:bg-red-50"
+                    onClick={() => handleStatusChange("rejeté")}
+                    disabled={isUpdating || cas.statut === "REJETE"}
+                >
+                  <X className="h-4 w-4" />
+                  Rejeter
+                </Button>
+                <Button onClick={startChallenge} className="gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  Lancer le Defi Expert
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -206,8 +244,8 @@ const CaseDetailPage = () => {
           icon={<User className="h-5 w-5 text-primary" />}
           className="mb-4"
         >
-          <DetailItem label="Age" value={`${cas.donnees_personnelles.age} ans`} />
-          <DetailItem label="Sexe" value={cas.donnees_personnelles.sexe} />
+          <DetailItem label="Age" value={`${cas.donnees_patient.age} ans`} />
+          <DetailItem label="Sexe" value={cas.donnees_patient.sexe} />
         </DetailSection>
 
         {/* Symptoms - Always visible */}
@@ -216,7 +254,7 @@ const CaseDetailPage = () => {
           icon={<Stethoscope className="h-5 w-5 text-primary" />}
           className="mb-4"
         >
-          {cas.symptomes.map((s, i) => (
+          {cas.symptomes?.map((s, i) => (
             <DetailItem
               key={i}
               label={s.nom}
@@ -233,7 +271,7 @@ const CaseDetailPage = () => {
               icon={<Stethoscope className="h-5 w-5 text-primary" />}
               className="mb-4"
             >
-              {cas.diagnostic_physique.map((d, i) => (
+              {cas.diagnostic_physique?.map((d, i) => (
                 <DetailItem key={i} label={d.nom} value={d.resultat} />
               ))}
             </DetailSection>
@@ -243,7 +281,7 @@ const CaseDetailPage = () => {
               icon={<FlaskConical className="h-5 w-5 text-primary" />}
               className="mb-4"
             >
-              {cas.examens_complementaires.map((e, i) => (
+              {cas.examens_complementaires?.map((e, i) => (
                 <DetailItem key={i} label={e.nom} value={e.resultat} />
               ))}
             </DetailSection>
