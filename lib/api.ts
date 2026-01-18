@@ -75,6 +75,16 @@ type BackendTraitement = {
     posologie: string | null;
 };
 
+type BackendLigneOrdonnance = {
+    nom_medicament: string;
+    dosage: string;
+    forme: string | null;
+    frequence: string;
+    duree: string;
+    voie: string;
+    consigne: string | null;
+};
+
 type BackendAllergie = {
     nom: string;
     manifestation: string | null;
@@ -137,6 +147,7 @@ type BackendClinicalCase = {
     diagnostic_final: string | null;
     indices_cliniques: string[];
     erreurs_courantes: string[];
+    ordonnance_ideale: BackendLigneOrdonnance[];
 };
 
 type BackendStats = {
@@ -239,6 +250,13 @@ export type CaseReviewData = {
     niveauDifficulte: string | null;
     specialiteMedicale: string | null;
     objectifsPedagogiques: string[];
+    ordonnanceIdeale: {
+        nom_medicament: string;
+        dosage: string;
+        forme: string;
+        frequence: string;
+        duree: string;
+    }[];
 };
 
 // Type pour les filtres disponibles
@@ -431,6 +449,13 @@ const mapCaseToReviewData = (backendCase: BackendClinicalCase): CaseReviewData =
         niveauDifficulte: backendCase.niveau_difficulte,
         specialiteMedicale: backendCase.specialite_medicale,
         objectifsPedagogiques: backendCase.objectifs_pedagogiques,
+        ordonnanceIdeale: (backendCase.ordonnance_ideale || []).map(ligne => ({
+            nom_medicament: ligne.nom_medicament,
+            dosage: ligne.dosage,
+            forme: ligne.forme || "",
+            frequence: ligne.frequence,
+            duree: ligne.duree,
+        }))
     };
 };
 

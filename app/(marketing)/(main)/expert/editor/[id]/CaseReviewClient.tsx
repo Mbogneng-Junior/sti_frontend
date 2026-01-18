@@ -349,6 +349,37 @@ export const CaseReviewClient = ({ caseData }: Props) => {
                                 </ul>
                             </div>
                         )}
+                              {/* DANS LA BARRE LATÉRALE DROITE (SOLUTION) */}
+{caseData.ordonnanceIdeale && caseData.ordonnanceIdeale.length > 0 && (
+<div className="mt-4">
+  <span className="font-semibold text-green-800 flex items-center gap-1 mb-2">
+      Ordonnance Type :
+  </span>
+  <div className="bg-white rounded border border-green-200 overflow-hidden">
+    <table className="w-full text-xs text-left">
+      <thead className="bg-green-50 text-green-900">
+        <tr>
+          <th className="p-2">Médicament</th>
+          <th className="p-2">Posologie</th>
+          <th className="p-2">Durée</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-100">
+        {caseData.ordonnanceIdeale.map((ligne, idx) => (
+          <tr key={idx}>
+            <td className="p-2 font-medium">{ligne.nom_medicament}</td>
+            <td className="p-2 text-gray-600">
+              {ligne.dosage}, {ligne.forme}<br/>
+              <span className="italic">{ligne.frequence}</span>
+            </td>
+            <td className="p-2">{ligne.duree}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
+)}
 
                     </CardContent>
                 </Card>

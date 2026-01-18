@@ -14,11 +14,17 @@ const MainLayout = ({
 }: Props) => {
     const pathname = usePathname();
     const isExpertRoute = pathname?.startsWith('/expert');
+    const isAdminRoute = pathname?.startsWith('/admin');
     const isLearnRoute = pathname?.startsWith('/learn');
     const isProfilingRoute = pathname?.startsWith('/profiling');
 
     // Pour les routes expert, on ne rend que les children (pas de sidebar Tuteur5GI)
     if (isExpertRoute) {
+        return <>{children}</>;
+    }
+
+    // Pour les routes admin, on ne rend que les children (AdminLayout gere la sidebar)
+    if (isAdminRoute) {
         return <>{children}</>;
     }
 

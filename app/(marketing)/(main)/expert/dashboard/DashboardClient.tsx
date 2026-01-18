@@ -27,7 +27,7 @@ export const DashboardClient = ({ initialData }: Props) => {
   };
 
   const handleViewDetails = (caseId: string) => {
-    router.push(`/expert/${caseId}`);
+    router.push(`/expert/editor/${caseId}`);
   };
 
   return (
