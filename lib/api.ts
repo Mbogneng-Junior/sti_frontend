@@ -186,6 +186,16 @@ type BackendTraitement = {
     posologie: string | null;
 };
 
+type BackendLigneOrdonnance = {
+    nom_medicament: string;
+    dosage: string;
+    forme: string | null;
+    frequence: string;
+    duree: string;
+    voie: string;
+    consigne: string | null;
+};
+
 type BackendAllergie = {
     nom: string;
     manifestation: string | null;
@@ -226,16 +236,18 @@ type BackendDonneesPersonnelles = {
 };
 
 type BackendClinicalCase = {
-    id_unique: string;
+     id_unique: string;
     hash_authentification?: string;
-    statut: string; // "en_attente" | "valide" | "rejete" | "PUBLIE" etc.
-    // status: "en_attente" | "valide" | "rejete"; // Changed to 'statut' due to backend field name
+    statut: string;
     date_creation: string | null;
     date_validation: string | null;
     validateur_id: string | null;
     commentaire_validation: string | null;
-    niveau_difficulte: string | null;
-    pathologie_principale: string | null;
+    
+    // Noms mis à jour pour correspondre au Backend Django
+    difficulte: string | null;         // au lieu de niveau_difficulte
+    pathologie: string | null;         // au lieu de pathologie_principale
+    
     specialite_medicale: string | null;
     domaine_nom?: string; // Ajouté via serializer
     objectifs_pedagogiques: string[];
@@ -244,12 +256,16 @@ type BackendClinicalCase = {
     mode_de_vie: BackendModeDeVie;
     antecedents_medicaux: BackendAntecedents;
     symptomes: BackendSymptom[];
-    diagnostic_physique: BackendDiagnosticPhysique[];
+    
+    // Noms mis à jour pour les listes (pluriel et simplification)
+    diagnostics_physiques: BackendDiagnosticPhysique[]; 
     examens_complementaires: BackendExamen[];
-    traitement_en_cours: BackendTraitement[];
+    traitement: BackendLigneOrdonnance[]; 
+    
     diagnostic_final: string | null;
     indices_cliniques: string[];
     erreurs_courantes: string[];
+    ordonnance_ideale: BackendLigneOrdonnance[];
 };
 
 type BackendStats = {
@@ -275,7 +291,7 @@ type BackendFilters = {
 // TYPES - Frontend (ce que les composants attendent)
 // ============================================================
 
-export type CaseStatus = "attente" | "validé" | "rejeté";
+export type CaseStatus = "attente" | "en_cours" | "validé" | "rejeté";
 
 export type ExpertCaseData = {
     id: string;
@@ -288,9 +304,10 @@ export type ExpertCaseData = {
 };
 
 export type DashboardData = {
-    kpis: { 
-        totalCases: number; 
-        pendingCases: number; 
+    kpis: {
+        totalCases: number;
+        pendingCases: number;
+        enCoursCases: number;  // Nouveau: cas en cours
         validatedCases: number;
         rejectedCases: number;
         trendTotal?: { value: number; period: string; };
@@ -353,6 +370,13 @@ export type CaseReviewData = {
     niveauDifficulte: string | null;
     specialiteMedicale: string | null;
     objectifsPedagogiques: string[];
+    ordonnanceIdeale: {
+        nom_medicament: string;
+        dosage: string;
+        forme: string;
+        frequence: string;
+        duree: string;
+    }[];
 };
 
 // Type pour les filtres disponibles
@@ -376,15 +400,17 @@ export type AvailableFilters = {
 const mapStatus = (backendStatus: string): CaseStatus => {
     switch (backendStatus) {
         case "en_attente": // Legacy
-        case "EN_REVISION": 
+        case "EN_REVISION":
         case "BROUILLON_IA": return "attente";
-        
+
+        case "EN_COURS": return "en_cours";
+
         case "valide": // Legacy
         case "PUBLIE": return "validé";
-        
+
         case "rejete": // Legacy
         case "REJETE": return "rejeté";
-        
+
         default: return "attente";
     }
 };
@@ -395,6 +421,7 @@ const mapStatus = (backendStatus: string): CaseStatus => {
 const mapStatusToBackend = (frontendStatus: CaseStatus): string => {
     switch (frontendStatus) {
         case "attente": return "EN_REVISION";
+        case "en_cours": return "EN_COURS";
         case "validé": return "PUBLIE";
         case "rejeté": return "REJETE";
         default: return "EN_REVISION";
@@ -424,13 +451,14 @@ const mapDifficulty = (level: string | null): "Débutant" | "Intermédiaire" | "
 
 const mapCaseToExpertData = (backendCase: BackendClinicalCase): ExpertCaseData => {
     return {
-        id: backendCase.id_unique,
-        patientAge: backendCase.donnees_patient.age,
-        gender: mapGender(backendCase.donnees_patient.sexe),
-        domain: backendCase.domaine_nom || backendCase.specialite_medicale || "Non défini",
+
+     id: backendCase.id_unique,
+        patientAge: backendCase.donnees_patient?.age || 0,
+        gender: mapGender(backendCase.donnees_patient?.sexe || "M"),
+        domain: backendCase.pathologie || "Non défini", // Corrigé
         extractionDate: backendCase.date_creation || new Date().toISOString(),
         status: mapStatus(backendCase.statut),
-        difficulty: mapDifficulty(backendCase.niveau_difficulte),
+        difficulty: mapDifficulty(backendCase.difficulte), // Corrigé
     };
 };
 
@@ -451,11 +479,17 @@ const determineLabStatus = (interpretation: string | null): "High" | "Normal" | 
 
 /**
  * Mappe un cas backend vers le format détaillé pour review
- */
-const mapCaseToReviewData = (backendCase: BackendClinicalCase): CaseReviewData => {
-    // Construire l'historique patient à partir du motif et des symptômes
-    const symptomesDescription = backendCase.symptomes
-        .map(s => {
+ */const mapCaseToReviewData = (backendCase: BackendClinicalCase): CaseReviewData => {
+    // 1. Préparation des données de sécurité
+    const symptomesArr = backendCase.symptomes || [];
+    const diagPhysiqueArr = backendCase.diagnostics_physiques || [];
+    const examensArr = backendCase.examens_complementaires || [];
+    // Le backend Django utilise "traitement" pour l'ordonnance idéale
+    const ordonnanceArr = backendCase.traitement || [];
+
+    // Construction de l'historique
+    const symptomesDescription = symptomesArr
+        .map((s: BackendSymptom) => {
             let desc = s.description_patient || s.nom;
             if (s.duree) desc += ` depuis ${s.duree}`;
             if (s.degre) desc += ` (${s.degre})`;
@@ -465,68 +499,28 @@ const mapCaseToReviewData = (backendCase: BackendClinicalCase): CaseReviewData =
     
     const patientHistory = `Motif de consultation: ${backendCase.motif_consultation}\n\n${symptomesDescription}`;
 
-    // Construire les antécédents médicaux
+    // Antécédents
     const pastMedicalHistory: string[] = [];
-    
-    // Antécédents familiaux
-    backendCase.antecedents_medicaux.antecedents_familiaux.forEach(a => {
-        pastMedicalHistory.push(a);
-    });
-    
-    // Maladies
-    backendCase.antecedents_medicaux.maladies.forEach(m => {
-        let entry = m.nom;
-        if (m.observation) entry += ` (${m.observation})`;
-        pastMedicalHistory.push(entry);
-    });
-    
-    // Allergies
-    backendCase.antecedents_medicaux.allergies.forEach(a => {
-        pastMedicalHistory.push(`Allergie: ${a.nom}${a.manifestation ? ` - ${a.manifestation}` : ''}`);
-    });
-    
-    // Chirurgies
-    backendCase.antecedents_medicaux.chirurgies.forEach(c => {
-        pastMedicalHistory.push(`Chirurgie: ${c.nom}${c.date ? ` (${c.date})` : ''}`);
-    });
-
-    // Vaccinations
-    if (backendCase.antecedents_medicaux.vaccinations.length > 0) {
-        pastMedicalHistory.push(`Vaccinations: ${backendCase.antecedents_medicaux.vaccinations.join(', ')}`);
+    if (backendCase.antecedents_medicaux) {
+        const ant = backendCase.antecedents_medicaux;
+        (ant.maladies || []).forEach(m => pastMedicalHistory.push(`${m.nom} ${m.observation ? `(${m.observation})` : ''}`));
+        (ant.antecedents_familiaux || []).forEach(a => pastMedicalHistory.push(a));
     }
+    if (pastMedicalHistory.length === 0) pastMedicalHistory.push("Aucun antécédent notable");
 
-    // Si aucun antécédent
-    if (pastMedicalHistory.length === 0) {
-        pastMedicalHistory.push("Aucun antécédent notable");
-    }
+    const mv = backendCase.mode_de_vie;
 
-    // Mode de vie
-    const voyages = backendCase.mode_de_vie.voyages
-        .filter(v => v.lieu)
-        .map(v => `${v.lieu}${v.duree ? ` (${v.duree})` : ''}`);
-    
-    const addictions = backendCase.mode_de_vie.addictions
-        .filter(a => a.nom)
-        .map(a => `${a.nom}${a.quantite ? `: ${a.quantite}` : ''}`);
-
-    // Résultats de laboratoire
-    const laboratoryResults = backendCase.examens_complementaires.map(exam => ({
-        testName: exam.nom,
-        result: exam.resultat || "Non disponible",
-        referenceRange: exam.valeur_normale || "N/A",
-        status: determineLabStatus(exam.interpretation),
-    }));
-
+    // LE RETURN CORRIGÉ
     return {
         id: backendCase.id_unique,
-        title: backendCase.pathologie_principale || backendCase.motif_consultation,
+        title: backendCase.pathologie || backendCase.motif_consultation,
         status: mapStatus(backendCase.statut),
         createdDate: backendCase.date_creation || new Date().toISOString(),
         patientInfo: {
             gender: mapGender(backendCase.donnees_patient.sexe),
             age: backendCase.donnees_patient.age,
-            bmi: backendCase.donnees_patient.groupe_sanguin || "N/A",
-            patientId: `#${backendCase.id_unique.split('-')[1] || backendCase.id_unique}`,
+            bmi: backendCase.donnees_patient.groupe_sanguin || "N/A", // On utilise groupe sanguin faute de BMI
+            patientId: `#${backendCase.id_unique}`,
             profession: backendCase.donnees_patient.profession,
             etatCivil: backendCase.donnees_patient.etat_civil,
             groupeSanguin: backendCase.donnees_patient.groupe_sanguin,
@@ -535,38 +529,50 @@ const mapCaseToReviewData = (backendCase: BackendClinicalCase): CaseReviewData =
         patientHistory,
         pastMedicalHistory,
         modeDeVie: {
-            qualiteEau: backendCase.mode_de_vie.qualite_eau,
-            moustiquaire: backendCase.mode_de_vie.moustiquaire,
-            habitat: backendCase.mode_de_vie.type_habitat,
-            voyages,
-            addictions,
+            qualiteEau: mv?.qualite_eau || null,
+            moustiquaire: mv?.moustiquaire || false,
+            habitat: mv?.type_habitat || null,
+            voyages: (mv?.voyages || []).map(v => v.lieu || ""),
+            addictions: (mv?.addictions || []).map(a => a.nom || ""),
         },
-        symptomes: backendCase.symptomes.map(s => ({
+        symptomes: symptomesArr.map((s: BackendSymptom) => ({
             nom: s.nom,
             description: s.description_patient,
             degre: s.degre,
             duree: s.duree,
             localisation: s.localisation,
         })),
-        diagnosticPhysique: backendCase.diagnostic_physique.map(d => ({
+        diagnosticPhysique: diagPhysiqueArr.map((d: BackendDiagnosticPhysique) => ({
             nom: d.nom,
             resultat: d.resultat,
         })),
-        laboratoryResults,
-        traitementEnCours: backendCase.traitement_en_cours.map(t => ({
-            nom: t.nom,
-            posologie: t.posologie,
-            efficacite: t.efficacite,
+        laboratoryResults: examensArr.map((exam: BackendExamen) => ({
+            testName: exam.nom,
+            result: exam.resultat || "N/A",
+            referenceRange: exam.valeur_normale || "N/A",
+            status: determineLabStatus(exam.interpretation),
         })),
+        
+        // --- FIX ERREUR 1 : Ajout de traitementEnCours ---
+        traitementEnCours: [], // On laisse vide car le transformer ne génère pas de traitement pré-existant
+
+        // --- FIX ERREUR 2 : Une seule fois ordonnanceIdeale ---
+        ordonnanceIdeale: ordonnanceArr.map(ligne => ({
+            nom_medicament: ligne.nom_medicament,
+            dosage: ligne.dosage,
+            forme: ligne.forme || "Non spécifié",
+            frequence: ligne.frequence,
+            duree: ligne.duree,
+        })),
+
         diagnosticFinal: backendCase.diagnostic_final,
-        indicesCliniques: backendCase.indices_cliniques,
-        erreursCourantes: backendCase.erreurs_courantes,
-        niveauDifficulte: backendCase.niveau_difficulte,
+        indicesCliniques: backendCase.indices_cliniques || [],
+        erreursCourantes: backendCase.erreurs_courantes || [],
+        niveauDifficulte: backendCase.difficulte,
         specialiteMedicale: backendCase.specialite_medicale,
-        objectifsPedagogiques: backendCase.objectifs_pedagogiques,
+        objectifsPedagogiques: backendCase.objectifs_pedagogiques || []
     };
 };
-
 
 // ============================================================
 // FONCTIONS API - CAS CLINIQUES
@@ -627,7 +633,7 @@ export const getCaseById = async (id: string): Promise<BackendClinicalCase> => {
  * Récupère les statistiques
  */
 export const getStats = async (): Promise<BackendStats> => {
-    // CHANGE: Adjusted endpoint to match DRF router path (action)
+    // Endpoint corrigé: l'action stats est sur cas-cliniques
     const response = await fetch(`${API_BASE_URL}/api/v1/expert/cas-cliniques/stats/`, {
         headers: getAuthHeaders()
     });
@@ -720,15 +726,17 @@ export const getExpertDashboardData = async (): Promise<DashboardData> => {
         const mappedCases = cases.map(mapCaseToExpertData);
 
         // Extraire les KPIs des stats
-        // Note: Backend keys match Django TextChoices (PUBLIE, EN_REVISION, REJETE, BROUILLON_IA)
+        // Note: Backend keys match Django TextChoices (PUBLIE, EN_REVISION, EN_COURS, REJETE, BROUILLON_IA)
         const pendingCases = (stats.par_status?.EN_REVISION || 0) + (stats.par_status?.BROUILLON_IA || 0) + (stats.par_status?.en_attente || 0);
-        const validatedCases = (stats.par_status?.PUBLIE || 0) + (stats.par_status?.valide || 0); // Include legacy 'valide' just in case
+        const enCoursCases = stats.par_status?.EN_COURS || 0;
+        const validatedCases = (stats.par_status?.PUBLIE || 0) + (stats.par_status?.valide || 0);
         const rejectedCases = (stats.par_status?.REJETE || 0) + (stats.par_status?.rejete || 0);
 
         return {
             kpis: {
                 totalCases: stats.total_cas,
                 pendingCases,
+                enCoursCases,
                 validatedCases,
                 rejectedCases,
                 trendTotal: { value: 12, period: "depuis le mois dernier" },
@@ -762,17 +770,50 @@ export const getCaseForReview = async (caseId: string): Promise<CaseReviewData> 
 // ============================================================
 
 /**
- * Valide un cas clinique
+ * Valide un cas clinique (utilise le nouvel endpoint dédié)
  */
 export const validateCase = async (caseId: string, commentaire?: string): Promise<any> => {
-    return updateCaseStatus(caseId, "validé", commentaire);
+    const response = await fetch(`${API_BASE_URL}/api/v1/expert/cas-cliniques/${caseId}/valider/`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ commentaire: commentaire || '' }),
+    });
+    return handleApiResponse(response);
 };
 
 /**
- * Rejette un cas clinique
+ * Rejette un cas clinique avec formulaire détaillé (selon PDF)
  */
-export const rejectCase = async (caseId: string, commentaire?: string): Promise<any> => {
-    return updateCaseStatus(caseId, "rejeté", commentaire);
+export const rejectCase = async (
+    caseId: string,
+    raison: string,
+    partiesConcernees?: string[],
+    emailNotification?: string,
+    commentaire?: string
+): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/expert/cas-cliniques/${caseId}/rejeter/`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+            raison,
+            parties_concernees: partiesConcernees || [],
+            email_notification: emailNotification || '',
+            commentaire: commentaire || ''
+        }),
+    });
+    return handleApiResponse(response);
+};
+
+/**
+ * Met un cas en cours de traitement par l'expert
+ */
+export const setEnCours = async (caseId: string, commentaire?: string): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/expert/cas-cliniques/${caseId}/en-cours/`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ commentaire: commentaire || '' }),
+    });
+    return handleApiResponse(response);
 };
 
 /**
@@ -814,6 +855,7 @@ export const getFilterOptions = async (): Promise<{
             statuses: [
                 { value: "all", label: "Tous les statuts" },
                 { value: "attente", label: "En attente" },
+                { value: "en_cours", label: "En cours" },
                 { value: "validé", label: "Validé" },
                 { value: "rejeté", label: "Rejeté" },
             ],
@@ -837,6 +879,7 @@ export const getFilterOptions = async (): Promise<{
             statuses: [
                 { value: "all", label: "Tous les statuts" },
                 { value: "attente", label: "En attente" },
+                { value: "en_cours", label: "En cours" },
                 { value: "validé", label: "Validé" },
                 { value: "rejeté", label: "Rejeté" },
             ],

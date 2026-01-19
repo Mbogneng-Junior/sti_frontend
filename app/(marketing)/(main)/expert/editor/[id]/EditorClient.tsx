@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { RawDataViewer } from "@/components/expert/raw-data-viewer";
 import { CaseEditorForm, type CaseFormData } from "@/components/expert/case-editor-form";
 import { ValidationActions } from "@/components/expert/validation-actions";
-import { updateCase, publishCase, rejectCase } from "@/lib/api";
+import { updateCase, publishCase, rejectCase, setEnCours, validateCase } from "@/lib/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ type Props = {
 
 export const EditorClient = ({ caseId, initialRawData, initialFormData }: Props) => {
   const [formData, setFormData] = useState(initialFormData);
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   const handleSave = (data: CaseFormData) => {
@@ -26,32 +27,56 @@ export const EditorClient = ({ caseId, initialRawData, initialFormData }: Props)
     console.log("Form data updated in state", data);
   };
 
-  const handleReject = async () => {
+  // Rejet avec formulaire détaillé (selon PDF)
+  const handleReject = async (raison: string, partiesConcernees: string[], emailNotification: string) => {
+    setIsLoading(true);
     try {
-      await rejectCase(caseId);
-      alert("Cas rejete avec succes.");
+      await rejectCase(caseId, raison, partiesConcernees, emailNotification);
+      alert("Cas rejeté avec succès. Un email a été envoyé si une adresse était fournie.");
       router.push("/expert/dashboard");
     } catch (error) {
       alert(`Erreur lors du rejet : ${error}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSaveDraft = async () => {
+    setIsLoading(true);
     try {
       await updateCase(caseId, formData);
-      alert("Brouillon sauvegarde avec succes.");
+      alert("Brouillon sauvegardé avec succès.");
     } catch (error) {
       alert(`Erreur lors de la sauvegarde : ${error}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handlePublish = async () => {
+    setIsLoading(true);
     try {
-      await publishCase(caseId);
-      alert("Cas publie avec succes.");
-      router.push("/expert/library");
+      await validateCase(caseId, "Validé et publié par l'expert");
+      alert("Cas validé et publié avec succès.");
+      router.push("/expert/validated");
     } catch (error) {
-      alert(`Erreur lors de la publication : ${error}`);
+      alert(`Erreur lors de la validation : ${error}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Nouveau: mettre en cours
+  const handleSetEnCours = async () => {
+    setIsLoading(true);
+    try {
+      await setEnCours(caseId, "Cas en cours de révision");
+      alert("Cas marqué comme 'en cours' avec succès.");
+      router.push("/expert/pending");
+    } catch (error) {
+      alert(`Erreur : ${error}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -106,6 +131,8 @@ export const EditorClient = ({ caseId, initialRawData, initialFormData }: Props)
         onReject={handleReject}
         onSaveDraft={handleSaveDraft}
         onPublish={handlePublish}
+        onSetEnCours={handleSetEnCours}
+        isLoading={isLoading}
       />
     </div>
   );

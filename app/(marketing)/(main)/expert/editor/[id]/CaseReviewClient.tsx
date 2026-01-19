@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { validateCase, rejectCase, getCaseForReview, type CaseReviewData } from "@/lib/api";
+import { validateCase, rejectCase, setEnCours, getCaseForReview, type CaseReviewData } from "@/lib/api";
 import { 
   User, Activity, Shield, Droplets, Plane, 
   MapPin, Loader2, Clock, Calendar, Stethoscope, Pill, AlertTriangle, Download
@@ -26,7 +26,7 @@ type Props = {
   caseId: string;
 };
 
-type DecisionType = 'validate' | 'revise' | 'reject' | null;
+type DecisionType = 'validate' | 'en_cours' | 'reject' | null;
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -49,6 +49,8 @@ const getLabStatusBadge = (status: string) => {
   }
 };
 
+
+
 export const CaseReviewClient = ({ caseId }: Props) => {
   const [caseData, setCaseData] = useState<CaseReviewData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,6 +59,21 @@ export const CaseReviewClient = ({ caseId }: Props) => {
   const [decision, setDecision] = useState<DecisionType>(null);
   const [notes, setNotes] = useState("");
   const router = useRouter();
+  const [selectedParts, setSelectedParts] = useState<string[]>([]);
+const [notifEmail, setNotifEmail] = useState("");
+
+const rejectionParts = [
+  "Anamnèse", "Examen Physique", "Paraclinique", "Diagnostic", "Ordonnance"
+];
+
+const togglePart = (part: string) => {
+  setSelectedParts(prev => 
+    prev.includes(part) ? prev.filter(p => p !== part) : [...prev, part]
+  );
+};
+
+
+
 
   useEffect(() => {
     const loadCase = async () => {
@@ -73,26 +90,46 @@ export const CaseReviewClient = ({ caseId }: Props) => {
     loadCase();
   }, [caseId]);
 
-  const handleSubmit = async () => {
-    if (!caseData) return;
+ const handleSubmit = async () => {
+  if (!caseData) return;
+  if (!decision) {
+    alert("Veuillez sélectionner une décision");
+    return;
+  }
 
-    if (!decision) {
-      alert("Veuillez sélectionner une décision");
-      return;
-    }
-    // ... (Logique identique à ton code précédent) ...
-    if (decision === 'validate') {
-      if (!confirm("Valider ce cas ?")) return;
-      setIsValidating(true);
-      try { await validateCase(caseData.id); router.push("/expert/dashboard"); } 
-      catch (e) { alert(e); } finally { setIsValidating(false); }
-    } else if (decision === 'reject') {
-      if (!confirm("Rejeter ce cas ?")) return;
-      setIsRejecting(true);
-      try { await rejectCase(caseData.id); router.push("/expert/dashboard"); } 
-      catch (e) { alert(e); } finally { setIsRejecting(false); }
-    }
-  };
+  if (decision === 'validate') {
+    if (!confirm("Valider ce cas ?")) return;
+    setIsValidating(true);
+    try { 
+      await validateCase(caseData.id, notes); 
+      router.push("/expert/dashboard"); 
+    } catch (e) { alert(e); } 
+    finally { setIsValidating(false); }
+  } 
+  
+  else if (decision === 'en_cours') {
+    setIsValidating(true); // Utilise un état de chargement
+    try { 
+      await setEnCours(caseData.id, notes); 
+      router.push("/expert/dashboard"); 
+    } catch (e) { alert(e); } 
+    finally { setIsValidating(false); }
+  }
+
+  else if (decision === 'reject') {
+  if (!notes || !notifEmail) {
+    alert("La raison et l'email de notification sont obligatoires pour un rejet.");
+    return;
+  }
+  setIsRejecting(true);
+  try { 
+    // On envoie toutes les infos demandées par le PDF
+    await rejectCase(caseData.id, notes, selectedParts, notifEmail); 
+    router.push("/expert/dashboard"); 
+  } catch (e) { alert(e); } 
+  finally { setIsRejecting(false); }
+}
+};
 
   const handleDownload = () => {
       if (!caseData) return;
@@ -393,6 +430,37 @@ export const CaseReviewClient = ({ caseId }: Props) => {
                                 </ul>
                             </div>
                         )}
+                              {/* DANS LA BARRE LATÉRALE DROITE (SOLUTION) */}
+{caseData.ordonnanceIdeale && caseData.ordonnanceIdeale.length > 0 && (
+<div className="mt-4">
+  <span className="font-semibold text-green-800 flex items-center gap-1 mb-2">
+      Ordonnance Type :
+  </span>
+  <div className="bg-white rounded border border-green-200 overflow-hidden">
+    <table className="w-full text-xs text-left">
+      <thead className="bg-green-50 text-green-900">
+        <tr>
+          <th className="p-2">Médicament</th>
+          <th className="p-2">Posologie</th>
+          <th className="p-2">Durée</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-100">
+        {caseData.ordonnanceIdeale.map((ligne, idx) => (
+          <tr key={idx}>
+            <td className="p-2 font-medium">{ligne.nom_medicament}</td>
+            <td className="p-2 text-gray-600">
+              {ligne.dosage}, {ligne.forme}<br/>
+              <span className="italic">{ligne.frequence}</span>
+            </td>
+            <td className="p-2">{ligne.duree}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
+)}
 
                     </CardContent>
                 </Card>
@@ -405,34 +473,77 @@ export const CaseReviewClient = ({ caseId }: Props) => {
                   <CardContent className="space-y-5">
                     <RadioGroup value={decision || ""} onValueChange={(v) => setDecision(v as DecisionType)}>
                       
-                      <div className={`flex items-start space-x-3 p-3 rounded-lg border transition-all ${decision === 'validate' ? 'bg-green-50 border-green-200' : 'hover:bg-gray-50 border-transparent'}`}>
-                        <RadioGroupItem value="validate" id="validate" className="mt-1" />
-                        <Label htmlFor="validate" className="cursor-pointer">
-                          <span className="font-semibold text-gray-900 block">Valider le cas</span>
-                          <span className="text-xs text-gray-500">Données cohérentes et complètes. Prêt pour le LLM.</span>
-                        </Label>
-                      </div>
+                      {/* OPTION VALIDER */}
+  <div className={`flex items-start space-x-3 p-3 rounded-lg border transition-all ${decision === 'validate' ? 'bg-green-50 border-green-200' : 'hover:bg-gray-50 border-transparent'}`}>
+    <RadioGroupItem value="validate" id="validate" className="mt-1" />
+    <Label htmlFor="validate" className="cursor-pointer">
+      <span className="font-semibold text-gray-900 block">Valider le cas</span>
+      <span className="text-xs text-gray-500">Prêt pour publication.</span>
+    </Label>
+  </div>
 
-                      <div className={`flex items-start space-x-3 p-3 rounded-lg border transition-all ${decision === 'reject' ? 'bg-red-50 border-red-200' : 'hover:bg-gray-50 border-transparent'}`}>
-                        <RadioGroupItem value="reject" id="reject" className="mt-1" />
-                        <Label htmlFor="reject" className="cursor-pointer">
-                          <span className="font-semibold text-gray-900 block">Rejeter le cas</span>
-                          <span className="text-xs text-gray-500">Incohérences médicales ou données manquantes.</span>
-                        </Label>
-                      </div>
+  {/* NOUVELLE OPTION : EN COURS */}
+  <div className={`flex items-start space-x-3 p-3 rounded-lg border transition-all ${decision === 'en_cours' ? 'bg-amber-50 border-amber-200' : 'hover:bg-gray-50 border-transparent'}`}>
+    <RadioGroupItem value="en_cours" id="en_cours" className="mt-1" />
+    <Label htmlFor="en_cours" className="cursor-pointer">
+      <span className="font-semibold text-amber-900 block">Mettre en cours</span>
+      <span className="text-xs text-amber-600">Besoin de temps pour vérifier certaines données.</span>
+    </Label>
+  </div>
+
+  {/* OPTION REJETER */}
+  <div className={`flex items-start space-x-3 p-3 rounded-lg border transition-all ${decision === 'reject' ? 'bg-red-50 border-red-200' : 'hover:bg-gray-50 border-transparent'}`}>
+    <RadioGroupItem value="reject" id="reject" className="mt-1" />
+    <Label htmlFor="reject" className="cursor-pointer">
+      <span className="font-semibold text-gray-900 block">Rejeter le cas</span>
+      <span className="text-xs text-gray-500">Incohérences médicales majeures.</span>
+    </Label>
+  </div>
 
                     </RadioGroup>
+                     {/* ================== AJOUT ICI : FORMULAIRE DE REJET CONDITIONNEL ================== */}
+  {decision === 'reject' && (
+    <div className="space-y-4 p-4 bg-red-50 rounded-lg border border-red-100 animate-in fade-in slide-in-from-top-2">
+      <Label className="text-red-800 font-bold text-sm">Précisions pour le rejet (Requis)</Label>
+      
+      <p className="text-xs text-red-600 font-medium">Parties du cas posant problème :</p>
+      <div className="grid grid-cols-2 gap-2">
+        {rejectionParts.map(part => (
+          <label key={part} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-red-100 p-1 rounded">
+            <input 
+              type="checkbox" 
+              checked={selectedParts.includes(part)}
+              onChange={() => togglePart(part)}
+              className="rounded border-red-300 text-red-600"
+            />
+            {part}
+          </label>
+        ))}
+      </div>
 
-                    <div>
-                      <Label className="text-sm font-medium mb-2 block">Commentaire (Optionnel)</Label>
-                      <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        className="w-full p-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                        rows={3}
-                        placeholder="Note pour l'équipe technique..."
-                      />
-                    </div>
+      <div className="space-y-1">
+        <Label className="text-xs text-red-800">Email de notification (Fultang/Admin)</Label>
+        <input
+          type="email"
+          value={notifEmail}
+          onChange={(e) => setNotifEmail(e.target.value)}
+          placeholder="ex: controle@hospital.cm"
+          className="w-full p-2 text-sm border border-red-200 rounded shadow-sm focus:ring-red-500 outline-none"
+        />
+      </div>
+    </div>
+  )}
+  {/* ================================================================================= */}
+                  <div>
+    <Label className="text-sm font-medium mb-2 block">Commentaire (Raison du rejet ou note)</Label>
+    <textarea
+      value={notes}
+      onChange={(e) => setNotes(e.target.value)}
+      className="w-full p-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+      rows={3}
+      placeholder={decision === 'reject' ? "Expliquez précisément pourquoi le cas est rejeté..." : "Note optionnelle..."}
+    />
+  </div>
 
                     <Button
                       onClick={handleSubmit}

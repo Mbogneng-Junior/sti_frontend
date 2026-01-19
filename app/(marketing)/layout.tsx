@@ -11,11 +11,17 @@ type Props = {
 const MarketingLayout = ({ children }: Props) => {
     const pathname = usePathname();
     const isExpertRoute = pathname?.startsWith('/expert');
+    const isAdminRoute = pathname?.startsWith('/admin');
     const isProfilingRoute = pathname?.startsWith('/profiling');
     const isHomePage = pathname === '/';
 
     // Pour les routes expert, on ne rend que les children (pas de Header)
     if (isExpertRoute) {
+        return <>{children}</>;
+    }
+
+    // Pour les routes admin, on ne rend que les children (AdminLayout gere le header)
+    if (isAdminRoute) {
         return <>{children}</>;
     }
 
