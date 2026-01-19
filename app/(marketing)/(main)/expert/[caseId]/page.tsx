@@ -96,8 +96,9 @@ const CaseDetailPage = () => {
       try {
         const data = await getCaseById(caseId);
         setCas(data);
-      } catch (e: any) {
-        setError(e.message || "Impossible de charger les details du cas.");
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Impossible de charger les details du cas.";
+        setError(message);
         console.error(e);
       } finally {
         setIsLoading(false);
@@ -125,9 +126,10 @@ const CaseDetailPage = () => {
       await updateCaseStatus(cas.id_unique, newStatus);
       const updatedCas = await getCaseById(cas.id_unique);
       setCas(updatedCas);
-    } catch (e: any) {
+    } catch (e) {
       console.error("Failed to update status", e);
-      alert("Erreur lors de la mise à jour du statut: " + e.message);
+      const message = e instanceof Error ? e.message : "Erreur inconnue";
+      alert("Erreur lors de la mise à jour du statut: " + message);
     } finally {
       setIsUpdating(false);
     }
@@ -189,7 +191,7 @@ const CaseDetailPage = () => {
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          Retour a l'explorateur
+          Retour a l&apos;explorateur
         </Link>
 
         {/* Header */}
@@ -271,7 +273,7 @@ const CaseDetailPage = () => {
               icon={<Stethoscope className="h-5 w-5 text-primary" />}
               className="mb-4"
             >
-              {cas.diagnostic_physique?.map((d, i) => (
+              {cas.diagnostics_physiques?.map((d, i) => (
                 <DetailItem key={i} label={d.nom} value={d.resultat} />
               ))}
             </DetailSection>
@@ -300,7 +302,7 @@ const CaseDetailPage = () => {
                   <div>
                     <CardTitle className="text-xl text-primary">Mode Defi Expert</CardTitle>
                     <CardDescription>
-                      Les sections "Diagnostic" et "Examens" sont masquees
+                      Les sections &quot;Diagnostic&quot; et &quot;Examens&quot; sont masquees
                     </CardDescription>
                   </div>
                 </div>
@@ -371,7 +373,7 @@ const CaseDetailPage = () => {
                     title="Diagnostic Physique"
                     icon={<Stethoscope className="h-5 w-5 text-primary" />}
                   >
-                    {cas.diagnostic_physique.map((d, i) => (
+                    {cas.diagnostics_physiques.map((d, i) => (
                       <DetailItem key={i} label={d.nom} value={d.resultat} />
                     ))}
                   </DetailSection>
