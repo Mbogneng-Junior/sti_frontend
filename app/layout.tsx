@@ -1,4 +1,5 @@
 import "./globals.css";
+import "driver.js/dist/driver.css";
 import { AuthProvider } from "@/hooks/useAuth"; // Importez le provider que nous venons de créer
 import { Toaster } from "sonner"; // Composant pour afficher les notifications (ex: "Inscription réussie")
 

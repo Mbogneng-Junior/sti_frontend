@@ -1,9 +1,5 @@
 @import 'tailwindcss';
 
-/* Importe le CSS de driver ici plutôt que dans le composant .tsx */
-/* Cela permet de mieux contrôler l'ordre des styles */
-@import "driver.js/dist/driver.css";
-
 html, 
 body,
 :root {
