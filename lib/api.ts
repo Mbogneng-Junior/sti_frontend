@@ -702,7 +702,7 @@ export const exportCases = async (filters?: {
         if (filters.status) params.append('status', filters.status);
     }
     
-    const url = `${API_BASE_URL}/export${params.toString() ? '?' + params.toString() : ''}`;
+    const url = `${API_BASE_URL}/extraction/export/json/?${params.toString()}`;
     const response = await fetch(url);
     return handleApiResponse(response);
 };
@@ -1131,6 +1131,9 @@ export const endTutorSession = async (sessionId: string): Promise<SummativeData>
     });
     return handleApiResponse(response);
 }
+
+
+
 
 
 
