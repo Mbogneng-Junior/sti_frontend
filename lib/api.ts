@@ -588,6 +588,7 @@ export const getCases = async (filters?: {
     gender?: string;
     profession?: string;
     symptom?: string;
+    specialite?: string;
     pathologie?: string;
     niveau?: string;
     status?: string;
@@ -603,6 +604,7 @@ export const getCases = async (filters?: {
         if (filters.profession) params.append('profession', filters.profession);
         if (filters.symptom) params.append('symptom', filters.symptom);
         if (filters.pathologie) params.append('pathologie', filters.pathologie);
+        if (filters.specialite) params.append('specialite', filters.specialite);
         if (filters.niveau) params.append('niveau', filters.niveau);
         if (filters.status) params.append('status', mapStatusToBackend(filters.status as CaseStatus));
         if (filters.limit) params.append('limit', filters.limit.toString());

@@ -303,7 +303,40 @@ const togglePart = (part: string) => {
                     </CardContent>
                   </Card>
               </div>
-
+                        {/* --- NOUVELLE SECTION : SYMPTÔMES DÉTAILLÉS --- */}
+<Card className="shadow-sm border-l-4 border-l-orange-400">
+  <CardHeader className="pb-2">
+    <CardTitle className="text-lg flex items-center gap-2 text-orange-700">
+      <Activity className="h-5 w-5" />
+      Symptômes rapportés
+    </CardTitle>
+  </CardHeader>
+  <CardContent>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {caseData.symptomes.length > 0 ? (
+        caseData.symptomes.map((s, idx) => (
+          <div key={idx} className="flex flex-col p-3 bg-orange-50/50 rounded-lg border border-orange-100">
+            <div className="flex justify-between items-start mb-1">
+              <span className="font-bold text-slate-900">{s.nom}</span>
+              {s.degre && (
+                <Badge variant="outline" className="text-[10px] bg-white text-orange-600 border-orange-200">
+                  {s.degre}
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-slate-600 italic">&quot;{s.description || `Plainte de ${s.nom.toLowerCase()}`}&quot;</p>
+            <div className="flex gap-2 mt-2">
+               {s.duree && <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500">⏳ {s.duree}</span>}
+               {s.localisation && <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500">📍 {s.localisation}</span>}
+            </div>
+          </div>
+        ))
+      ) : (
+        <p className="text-sm text-gray-400 italic">Aucun symptôme spécifique listé.</p>
+      )}
+    </div>
+  </CardContent>
+</Card>
               {/* 4. EXAMEN PHYSIQUE (NOUVEAU) */}
               <Card className="shadow-sm border-t-4 border-t-purple-500">
                 <CardHeader>
