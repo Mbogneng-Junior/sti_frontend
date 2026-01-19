@@ -16,7 +16,7 @@ import {
 import { validateCase, rejectCase, setEnCours, getCaseForReview, type CaseReviewData } from "@/lib/api";
 import { 
   User, Activity, Shield, Droplets, Plane, 
-  MapPin, Loader2, Clock, Calendar, Stethoscope, Pill, AlertTriangle
+  MapPin, Loader2, Clock, Calendar, Stethoscope, Pill, AlertTriangle, Download
 } from "lucide-react";
 import { ExpertSidebar } from "@/components/expert-sidebar";
 import { Label } from "@/components/ui/label";
@@ -131,6 +131,19 @@ const togglePart = (part: string) => {
 }
 };
 
+  const handleDownload = () => {
+      if (!caseData) return;
+      const jsonString = JSON.stringify(caseData, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `case-${caseData.id}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+  };
+
   if (isLoading) {
       return (
           <div className="flex h-screen items-center justify-center bg-gray-50">
@@ -158,6 +171,9 @@ const togglePart = (part: string) => {
               </div>
             </div>
             <div className="flex gap-2">
+               <Button onClick={handleDownload} variant="outline" size="sm" className="hidden sm:flex">
+                  <Download className="h-4 w-4 mr-2" /> Exporter JSON
+               </Button>
                {getStatusBadge(caseData.status)}
             </div>
           </div>

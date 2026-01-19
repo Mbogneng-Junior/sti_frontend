@@ -24,6 +24,7 @@ export default function MarketingPage() {
     const [domaineId, setDomaineId] = useState("");
 
     const [domaines, setDomaines] = useState<{ id: string, nom: string }[]>([]);
+    const [hasLoadedDomaines, setHasLoadedDomaines] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -43,14 +44,17 @@ export default function MarketingPage() {
     }, [user, role, router]);
 
     useEffect(() => {
-        if (userRole === 'expert' && authMode === 'register' && domaines.length === 0) {
+        if (userRole === 'expert' && authMode === 'register' && !hasLoadedDomaines) {
             setIsLoading(true);
             getDomaines()
-                .then(setDomaines)
+                .then((data) => {
+                    setDomaines(data);
+                    setHasLoadedDomaines(true);
+                })
                 .catch(() => setError("Impossible de charger les domaines."))
                 .finally(() => setIsLoading(false));
         }
-    }, [userRole, authMode, domaines.length]);
+    }, [userRole, authMode, hasLoadedDomaines]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -279,7 +283,7 @@ export default function MarketingPage() {
                                                     <SelectValue placeholder="Sélectionnez votre spécialité" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    {domaines.map(d => <SelectItem key={d.id} value={d.id}>{d.nom}</SelectItem>)}
+                                                    {domaines.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.nom}</SelectItem>)}
                                                 </SelectContent>
                                             </Select>
                                         </div>

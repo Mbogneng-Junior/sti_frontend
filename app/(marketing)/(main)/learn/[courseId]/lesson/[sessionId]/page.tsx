@@ -160,8 +160,17 @@ export default function LessonPage() {
     setLoading(true);
     try {
         const data = await endTutorSession(sessionId);
-        setSummativeData(data);
-        setIsSummativeOpen(true);
+        // Si data contient directement les clés, on l'utilise.
+        // Sinon, si les clés sont dans data.bilan, on fait l'adaptation.
+        // Vérification de sécurité pour éviter le crash client side
+        if (data && typeof data === 'object') {
+             // Adaptation si c'est encapsulé
+             const finalData = data.bilan ? data.bilan : data; 
+             setSummativeData(finalData);
+             setIsSummativeOpen(true);
+        } else {
+             console.error("Format de réponse inattendu pour le bilan:", data);
+        }
     } catch (error) {
         console.error("Failed to end session:", error);
     } finally {

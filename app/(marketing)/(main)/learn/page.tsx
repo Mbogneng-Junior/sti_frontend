@@ -189,32 +189,61 @@ export default function LearnDashboardPage() {
           </div>
         </div>
 
-        {/* Proficiency Profile */}
-        <Card className="border-0 shadow-sm bg-white">
-          <CardHeader className="px-4 sm:px-6 pb-3 sm:pb-4">
-            <CardTitle className="text-lg sm:text-xl font-semibold text-gray-900 flex items-center gap-2 sm:gap-3">
-              <div className="w-1 sm:w-1.5 h-6 sm:h-7 bg-gradient-to-b from-green-500 to-emerald-600 rounded-full" />
-              Profil de Compétences
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 sm:px-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 lg:gap-5">
-              {dashboardData?.proficiency_data.map((item) => (
-                <ProficiencyBar
-                  key={item.id}
-                  label={item.label}
-                  value={item.value}
-                  color={item.color}
-                  bgColor={item.bgColor}
-                  description={item.description}
-                />
-              ))}
-              {!dashboardData && (
-                 <div className="col-span-2 text-center text-gray-500 py-10">Chargement des données...</div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
+            {/* Proficiency Profile */}
+            <Card className="border-0 shadow-sm bg-white h-full">
+            <CardHeader className="px-4 sm:px-6 pb-3 sm:pb-4">
+                <CardTitle className="text-lg sm:text-xl font-semibold text-gray-900 flex items-center gap-2 sm:gap-3">
+                <div className="w-1 sm:w-1.5 h-6 sm:h-7 bg-gradient-to-b from-green-500 to-emerald-600 rounded-full" />
+                Profil de Compétences
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 sm:px-6">
+                <div className="space-y-4">
+                {dashboardData?.proficiency_data.map((item) => (
+                    <ProficiencyBar
+                    key={item.id}
+                    label={item.label}
+                    value={item.value}
+                    color={item.color}
+                    bgColor={item.bgColor}
+                    description={item.description}
+                    />
+                ))}
+                {!dashboardData && (
+                    <div className="text-center text-gray-500 py-10">Chargement des données...</div>
+                )}
+                </div>
+            </CardContent>
+            </Card>
+
+            {/* Difficulties */}
+             <Card className="border-0 shadow-sm bg-white h-full">
+                <CardHeader className="px-4 sm:px-6 pb-3 sm:pb-4">
+                    <CardTitle className="text-lg sm:text-xl font-semibold text-gray-900 flex items-center gap-2 sm:gap-3">
+                    <div className="w-1 sm:w-1.5 h-6 sm:h-7 bg-gradient-to-b from-orange-500 to-red-600 rounded-full" />
+                    Difficultés Récemment Identifiées
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 sm:px-6">
+                    {dashboardData?.difficulties && dashboardData.difficulties.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                             {dashboardData.difficulties.map((diff, i) => (
+                                <div key={i} className="flex items-start gap-2 bg-red-50 text-red-700 px-3 py-2 rounded-lg text-sm border border-red-100">
+                                   <div className="mt-0.5 shrink-0 w-2 h-2 rounded-full bg-red-400" />
+                                   {diff}
+                                </div>
+                             ))}
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                            <Target className="w-12 h-12 mb-3 opacity-20" />
+                            <p>Aucune difficulté majeure récente.</p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
       </div>
     </div>
   );
