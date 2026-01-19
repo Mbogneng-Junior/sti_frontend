@@ -2,7 +2,8 @@
 // Connexion au backend FastAPI pour les cas cliniques
 
 // Utilisation de 127.0.0.1 pour éviter les problèmes de résolution IPv6/IPv4 sur localhost
-const API_BASE_URL ="http://104.236.244.230:8000/api/v1";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api/proxy";
 
 /**
  * Gets authorization headers with token if available
