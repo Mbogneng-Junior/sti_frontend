@@ -48,7 +48,7 @@ export interface StudentDashboardData {
 }
 
 export const getStudentDashboardStats = async (): Promise<StudentDashboardData> => {
-  const res = await fetch(`${API_BASE_URL}/api/v1/apprenant/dashboard/stats/`, {
+  const res = await fetch(`${API_BASE_URL}/apprenant/dashboard/stats/`, {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error("Erreur chargement dashboard");
@@ -65,7 +65,7 @@ export interface StudentSession {
 }
 
 export const getStudentSessions = async (): Promise<StudentSession[]> => {
-    const res = await fetch(`${API_BASE_URL}/api/v1/apprenant/dashboard/sessions/`, {
+    const res = await fetch(`${API_BASE_URL}/apprenant/dashboard/sessions/`, {
         headers: getAuthHeaders(),
     });
     if (!res.ok) throw new Error("Erreur chargement des sessions");
@@ -108,7 +108,7 @@ export interface FullProfileData {
 }
 
 export const getStudentFullProfile = async (): Promise<FullProfileData> => {
-   const res = await fetch(`${API_BASE_URL}/api/v1/apprenant/dashboard/full_profile/`, {
+   const res = await fetch(`${API_BASE_URL}/apprenant/dashboard/full_profile/`, {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error("Erreur chargement profil");
@@ -610,7 +610,7 @@ export const getCases = async (filters?: {
     }
     
     // CHANGE: Adjusted endpoint to match DRF router path
-    const url = `${API_BASE_URL}/api/v1/expert/cas-cliniques/${params.toString() ? '?' + params.toString() : ''}`;
+    const url = `${API_BASE_URL}/expert/cas-cliniques/${params.toString() ? '?' + params.toString() : ''}`;
     const response = await fetch(url, {
         headers: getAuthHeaders()
     });
@@ -624,7 +624,7 @@ export const getCases = async (filters?: {
  */
 export const getCaseById = async (id: string): Promise<BackendClinicalCase> => {
     // CHANGE: Adjusted endpoint to match DRF router path
-    const response = await fetch(`${API_BASE_URL}/api/v1/expert/cas-cliniques/${id}/`, {
+    const response = await fetch(`${API_BASE_URL}/expert/cas-cliniques/${id}/`, {
         headers: getAuthHeaders()
     });
     return handleApiResponse(response);
@@ -635,7 +635,7 @@ export const getCaseById = async (id: string): Promise<BackendClinicalCase> => {
  */
 export const getStats = async (): Promise<BackendStats> => {
     // Endpoint corrigé: l'action stats est sur cas-cliniques
-    const response = await fetch(`${API_BASE_URL}/api/v1/expert/cas-cliniques/stats/`, {
+    const response = await fetch(`${API_BASE_URL}/expert/cas-cliniques/stats/`, {
         headers: getAuthHeaders()
     });
     return handleApiResponse(response);
@@ -646,7 +646,7 @@ export const getStats = async (): Promise<BackendStats> => {
  */
 export const getFilters = async (): Promise<AvailableFilters> => {
     // CHANGE: Adjusted endpoint to match DRF router path (action)
-    const response = await fetch(`${API_BASE_URL}/api/v1/expert/cas-cliniques/filters/`, {
+    const response = await fetch(`${API_BASE_URL}/expert/cas-cliniques/filters/`, {
         headers: getAuthHeaders()
     });
     return handleApiResponse(response);
@@ -663,7 +663,7 @@ export const updateCaseStatus = async (
 ): Promise<any> => {
     // CHANGE: Adjusted endpoint to match DRF router path (PATCH on resource)
     const headers = getAuthHeaders() as Record<string, string>;
-    const response = await fetch(`${API_BASE_URL}/api/v1/expert/cas-cliniques/${caseId}/`, {
+    const response = await fetch(`${API_BASE_URL}/expert/cas-cliniques/${caseId}/`, {
         method: 'PATCH',
         headers: {
             ...headers,
@@ -681,7 +681,7 @@ export const updateCaseStatus = async (
  * Déclenche la régénération des cas
  */
 export const forceExtraction = async (): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/api/extract/refresh`, {
+    const response = await fetch(`${API_BASE_URL}/extract/refresh`, {
         method: 'POST',
     });
     return handleApiResponse(response);
@@ -702,7 +702,7 @@ export const exportCases = async (filters?: {
         if (filters.status) params.append('status', filters.status);
     }
     
-    const url = `${API_BASE_URL}/api/export${params.toString() ? '?' + params.toString() : ''}`;
+    const url = `${API_BASE_URL}/export${params.toString() ? '?' + params.toString() : ''}`;
     const response = await fetch(url);
     return handleApiResponse(response);
 };
@@ -774,7 +774,7 @@ export const getCaseForReview = async (caseId: string): Promise<CaseReviewData> 
  * Valide un cas clinique (utilise le nouvel endpoint dédié)
  */
 export const validateCase = async (caseId: string, commentaire?: string): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/expert/cas-cliniques/${caseId}/valider/`, {
+    const response = await fetch(`${API_BASE_URL}/expert/cas-cliniques/${caseId}/valider/`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ commentaire: commentaire || '' }),
@@ -792,7 +792,7 @@ export const rejectCase = async (
     emailNotification?: string,
     commentaire?: string
 ): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/expert/cas-cliniques/${caseId}/rejeter/`, {
+    const response = await fetch(`${API_BASE_URL}/expert/cas-cliniques/${caseId}/rejeter/`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -809,7 +809,7 @@ export const rejectCase = async (
  * Met un cas en cours de traitement par l'expert
  */
 export const setEnCours = async (caseId: string, commentaire?: string): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/expert/cas-cliniques/${caseId}/en-cours/`, {
+    const response = await fetch(`${API_BASE_URL}/expert/cas-cliniques/${caseId}/en-cours/`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ commentaire: commentaire || '' }),
@@ -917,7 +917,7 @@ export const updateExpertProfile = async (data: any) => {
 export const getDomaines = async () => {
     try {
         // Endpoint public : pas de token nécessaire pour éviter les 401 si token invalide stocké
-        const response = await fetch(`${API_BASE_URL}/api/v1/expert/domaines/`, {
+        const response = await fetch(`${API_BASE_URL}/expert/domaines/`, {
             headers: {
                 "Content-Type": "application/json"
             }
@@ -941,7 +941,7 @@ export const getDomaines = async () => {
 // TODO: Remplacer par de vrais appels API quand le backend auth sera prêt
 
 export const apprenantRegister = async (data: { nom: string; email: string; password: string }) => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/register/`, {
+    const response = await fetch(`${API_BASE_URL}/auth/register/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -950,7 +950,7 @@ export const apprenantRegister = async (data: { nom: string; email: string; pass
 };
 
 export const apprenantLogin = async (data: { email: string; password: string }) => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/login/`, {
+    const response = await fetch(`${API_BASE_URL}/auth/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -965,7 +965,7 @@ export const expertRegister = async (data: {
     matricule: string;
     domaine_expertise_id: string;
 }) => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/expert/register/`, {
+    const response = await fetch(`${API_BASE_URL}/auth/expert/register/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -974,7 +974,7 @@ export const expertRegister = async (data: {
 };
 
 export const expertLogin = async (data: { email: string; password: string }) => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/expert/login/`, {
+    const response = await fetch(`${API_BASE_URL}/auth/expert/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -1027,7 +1027,7 @@ export type ProfilingQuestion = {
 };
 
 export const getProfilingQuestions = async (token: string): Promise<ProfilingQuestion[]> => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/apprenant/questions-profiling/`, {
+    const response = await fetch(`${API_BASE_URL}/apprenant/questions-profiling/`, {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
@@ -1038,7 +1038,7 @@ export const getProfilingQuestions = async (token: string): Promise<ProfilingQue
 };
 
 export const submitProfiling = async (reponses: { [questionId: number]: number }, token: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/apprenant/questions-profiling/submit/`, {
+    const response = await fetch(`${API_BASE_URL}/apprenant/questions-profiling/submit/`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -1079,7 +1079,7 @@ export interface TutorInteractionResponse {
 }
 
 export const startTutorSession = async (emailApprenant: string, domaineNom: string): Promise<TutorSessionStartResponse> => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/tuteur/session/start/`, {
+    const response = await fetch(`${API_BASE_URL}/tuteur/session/start/`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -1091,7 +1091,7 @@ export const startTutorSession = async (emailApprenant: string, domaineNom: stri
 }
 
 export const sendTutorMessage = async (sessionId: string, messageEtudiant: string): Promise<TutorInteractionResponse> => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/tuteur/session/analyser/`, {
+    const response = await fetch(`${API_BASE_URL}/tuteur/session/analyser/`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -1103,7 +1103,7 @@ export const sendTutorMessage = async (sessionId: string, messageEtudiant: strin
 }
 
 export const getTutorSessionState = async (sessionId: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/tuteur/session/${sessionId}/state/`, {
+    const response = await fetch(`${API_BASE_URL}/tuteur/session/${sessionId}/state/`, {
         method: "GET",
         headers: getAuthHeaders(),
     });
@@ -1122,7 +1122,7 @@ export interface SummativeData {
 }
 
 export const endTutorSession = async (sessionId: string): Promise<SummativeData> => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/tuteur/session/end/`, {
+    const response = await fetch(`${API_BASE_URL}/tuteur/session/end/`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
