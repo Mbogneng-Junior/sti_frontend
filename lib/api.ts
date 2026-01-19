@@ -1,7 +1,7 @@
 // lib/api.ts
 // Connexion au backend FastAPI pour les cas cliniques
 
-// Utilisation de 127.0.0.1 pour éviter les problèmes de résolution IPv6/IPv4 sur localhost
+
 const API_BASE_URL = process.env.PYTHON_API_BASE_URL || "http://127.0.0.1:8000/api/v1";
 
 /**
