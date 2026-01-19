@@ -75,7 +75,7 @@ export function SummativeModal({ isOpen, onClose, data }: SummativeModalProps) {
                         <Stethoscope className="w-4 h-4 text-slate-500" /> Avis du Superviseur
                     </h3>
                     <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed italic">
-                        "{data.feedback_global}"
+                        &quot;{data.feedback_global}&quot;
                     </p>
                 </div>
 
@@ -100,7 +100,7 @@ export function SummativeModal({ isOpen, onClose, data }: SummativeModalProps) {
                     {/* Difficultés */}
                     <div>
                         <h3 className="text-sm font-semibold text-orange-600 dark:text-orange-400 mb-3 flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4" /> Axes d'amélioration
+                            <AlertTriangle className="w-4 h-4" /> Axes d&apos;amélioration
                         </h3>
                         <ul className="space-y-2">
                             {(data.difficultes_identifiees || []).map((pt, i) => (

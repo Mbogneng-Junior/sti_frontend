@@ -19,9 +19,19 @@ import {
   Brain,
   Heart
 } from "lucide-react";
+import { ProfilingQuestion } from "@/lib/api";
 
 // Types
-import { ProfilingQuestion } from "@/lib/api";
+interface ProfilingScores {
+  anamnese: number;
+  diagnostic: number;
+  traitement: number;
+  relationnel: number;
+}
+
+interface ProfilingResults {
+  scores: ProfilingScores;
+}
 
 export default function ProfilingPage() {
   const router = useRouter();
@@ -35,7 +45,7 @@ export default function ProfilingPage() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ [qId: number]: number }>({}); // qId -> optionIndex
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [results, setResults] = useState<{ scores: any } | null>(null);
+  const [results, setResults] = useState<ProfilingResults | null>(null);
 
   useEffect(() => {
     async function loadQuestions() {
@@ -50,7 +60,7 @@ export default function ProfilingPage() {
             setError("Format de données invalide reçu du serveur.");
         }
         setLoading(false);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err);
         setError("Impossible de charger les questions de profiling.");
         setLoading(false);
@@ -88,7 +98,7 @@ export default function ProfilingPage() {
     try {
       const response = await api.submitProfiling(answers, token);
       setResults(response);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
       setError("Erreur lors de la soumission des réponses.");
     } finally {
@@ -115,7 +125,7 @@ export default function ProfilingPage() {
         // Send empty answers to initialize with 0/Beginner
         const response = await api.submitProfiling({}, token);
         setResults(response);
-      } catch (err) {
+      } catch (err: unknown) {
         console.error(err);
         setError("Erreur lors de l'initialisation du profil.");
       } finally {
@@ -233,7 +243,7 @@ export default function ProfilingPage() {
                 onClick={handleSkip} 
                 className="text-slate-400 hover:text-slate-600 mb-1 h-auto py-1 px-2"
             >
-                Passer l'évaluation
+                Passer l&apos;évaluation
             </Button>
             <div>
                 <span className="text-sm font-semibold text-slate-900">Question {currentQuestionIndex + 1}</span>
@@ -259,7 +269,7 @@ export default function ProfilingPage() {
                     </Badge>
                 </div>
                 <h3 className="text-lg font-medium leading-relaxed italic text-slate-300 mb-2">
-                    "{currentQ.situation}"
+                    &quot;{currentQ.situation}&quot;
                 </h3>
                 <h2 className="text-xl md:text-2xl font-bold mt-4 leading-tight">
                     {currentQ.question_text}
@@ -268,7 +278,7 @@ export default function ProfilingPage() {
             
             <CardContent className="p-6 md:p-8 bg-white">
                 <div className="space-y-4">
-                    {currentQ.options.map((option, idx) => (
+                    {currentQ.options.map((option: { texte: string; score: number; feedback: string }, idx: number) => (
                         <button
                             key={idx}
                             onClick={() => handleOptionSelect(idx)}
@@ -317,7 +327,7 @@ export default function ProfilingPage() {
                         {isSubmitting ? (
                             <Loader2 className="h-5 w-5 animate-spin" />
                         ) : isLastQuestion ? (
-                            <>Terminer l'évaluation <CheckCircle2 className="ml-2 h-5 w-5" /></>
+                            <>Terminer l&apos;évaluation <CheckCircle2 className="ml-2 h-5 w-5" /></>
                         ) : (
                             <>Question suivante <ArrowRight className="ml-2 h-5 w-5" /></>
                         )}
@@ -330,7 +340,7 @@ export default function ProfilingPage() {
   );
 }
 
-function ScoreCard({ label, score, icon, color, barColor }: any) {
+function ScoreCard({ label, score, icon, color, barColor }: { label: string; score: number; icon: React.ReactNode; color: string; barColor: string }) {
     return (
         <div className="bg-slate-50 rounded-xl p-5 border border-slate-100">
             <div className="flex items-center justify-between mb-3">

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"; 
 import { Card } from "@/components/ui/card"; // Using Card for container
-import { Send, ArrowLeft, Loader2, Info, ChevronRight, Stethoscope, User, LogOut } from "lucide-react"; // Icons from sidebar or similar pages
+import { Send, Loader2, Info, ChevronRight, Stethoscope, LogOut } from "lucide-react"; // Only used icons
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { EvaluationModal } from "@/components/evaluation-modal";
@@ -20,6 +20,12 @@ interface Message {
   role: "doctor" | "patient" | "system";
   content: string;
   timestamp: Date;
+}
+
+// Types
+interface MessageHistory {
+  person: string;
+  message: string;
 }
 
 export default function LessonPage() {
@@ -77,13 +83,13 @@ export default function LessonPage() {
           const newUrl = `/learn/${courseId}/lesson/${response.session_id}?domain=${encodeURIComponent(decodedDomain)}`;
           window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, "", newUrl);
           
-        } catch (error: any) {
-          console.error("Failed to start session:", error);
+        } catch (error: unknown) {
+          const errMsg = (error instanceof Error) ? error.message : "Impossible de démarrer la session.";
           setMessages([
               {
                   id: "error-init",
                   role: "system",
-                  content: `Erreur d'initialisation: ${error.message || "Impossible de démarrer la session."}`,
+                  content: `Erreur d'initialisation: ${errMsg}`,
                   timestamp: new Date()
               }
           ])
@@ -96,7 +102,7 @@ export default function LessonPage() {
              const state = await getTutorSessionState(initialSessionId);
              if (state.chat_history && Array.isArray(state.chat_history)) {
                 // Map history
-                const mapped = state.chat_history.map((m: any, i:number) => ({
+                const mapped = state.chat_history.map((m: MessageHistory, i: number) => ({
                     id: `restored-${i}`,
                     role: m.person === 'doctor' ? 'doctor' : 'patient',
                     content: m.message,
@@ -164,8 +170,9 @@ export default function LessonPage() {
         // Sinon, si les clés sont dans data.bilan, on fait l'adaptation.
         // Vérification de sécurité pour éviter le crash client side
         if (data && typeof data === 'object') {
-             // Adaptation si c'est encapsulé
-             const finalData = data.bilan ? data.bilan : data; 
+             // Type guard for bilan property
+             const hasBilan = (obj: unknown): obj is { bilan: SummativeData } => typeof obj === 'object' && obj !== null && 'bilan' in obj;
+             const finalData = hasBilan(data) ? data.bilan : data;
              setSummativeData(finalData);
              setIsSummativeOpen(true);
         } else {

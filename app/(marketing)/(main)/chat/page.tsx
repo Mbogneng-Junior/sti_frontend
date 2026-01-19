@@ -67,7 +67,7 @@ export default function ChatListPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Vos Conversations</h1>
             <p className="text-gray-500 mt-2">
-              Retrouvez l'historique de vos cas cliniques et continuez votre apprentissage.
+              Retrouvez l&apos;historique de vos cas cliniques et continuez votre apprentissage.
             </p>
           </div>
           <Button onClick={handleStartNewSession} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/20 transition-all">
