@@ -8,45 +8,22 @@ import {
   LayoutDashboard, 
   Clock, 
   CheckCircle, 
-  XCircle, 
   Settings,
   LogOut,
   Library,
-  FileText
 } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 type Props = {
   className?: string;
 };
 
-// Menu mis à jour selon les exigences du PDF
 const menuItems = [
-  { 
-    label: "Gestion des Cas", 
-    href: "/expert/dashboard", 
-    icon: LayoutDashboard 
-  },
-  { 
-    label: "Cas en attente", 
-    href: "/expert/pending", 
-    icon: Clock 
-  },
-  { 
-    label: "Cas Validés", 
-    href: "/expert/validated", 
-    icon: CheckCircle 
-  },
-  { 
-    label: "Téléchargement des cas", // Libellé exact du PDF
-    href: "/expert/library", 
-    icon: Library 
-  },
-  { 
-    label: "Paramètres", 
-    href: "/expert/settings", 
-    icon: Settings 
-  },
+  { label: "Gestion des Cas", href: "/expert/dashboard", icon: LayoutDashboard },
+  { label: "Cas en attente", href: "/expert/pending", icon: Clock },
+  { label: "Cas Validés", href: "/expert/validated", icon: CheckCircle },
+  { label: "Téléchargement des cas", href: "/expert/library", icon: Library },
+  { label: "Paramètres", href: "/expert/settings", icon: Settings },
 ];
 
 export const ExpertSidebar = ({ className }: Props) => {
@@ -68,7 +45,7 @@ export const ExpertSidebar = ({ className }: Props) => {
         </Link>
       </div>
 
-      {/* Profil de l'Expert (Exigence PDF : Montrer l'expert responsable) */}
+      {/* Profil de l'Expert */}
       <div className="px-4 py-4 mb-4 mx-2 bg-slate-50 rounded-xl border border-slate-100">
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
@@ -98,6 +75,15 @@ export const ExpertSidebar = ({ className }: Props) => {
             <Link
               key={`${item.label}-${index}`}
               href={item.href}
+              // --- AJOUT DE L'ID ICI POUR LA VISITE GUIDÉE ---
+              id={
+                item.label === "Gestion des Cas" 
+                  ? "tour-gestion" 
+                  : item.label === "Téléchargement des cas" 
+                    ? "tour-download" 
+                    : undefined
+              }
+              // ----------------------------------------------
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 relative group",
                 isActive 

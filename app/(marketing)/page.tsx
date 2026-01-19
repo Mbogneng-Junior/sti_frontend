@@ -35,7 +35,7 @@ export default function MarketingPage() {
             } else {
                 // Si c'est un apprenant, on vérifie s'il doit passer le profiling
                 if (user.est_profile === false) {
-                    router.push('/profiling');
+                    router.push('/profile');
                 } else {
                     router.push('/learn');
                 }

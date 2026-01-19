@@ -6,6 +6,8 @@ import { DashboardStatCard } from "@/components/expert/dashboard-stat-card";
 import { ClinicalCasesTable } from "@/components/expert/clinical-cases-table";
 import { getExpertDashboardData, type DashboardData } from "@/lib/api";
 import { ExpertSidebar } from "@/components/expert-sidebar";
+//import { ExpertOnboarding } from "@/components/expert/expert-onboarding";
+import { ExpertTour } from "@/components/expert/expert-tour";
 import {
   FileText,
   Clock,
@@ -56,6 +58,9 @@ export const DashboardClient = () => {
 
   return (
     <div className="flex min-h-screen bg-gray-50">
+      {/* ONBOARDING UX (Pour le point du jury) */}
+        <ExpertTour />
+
       {/* Sidebar */}
       <ExpertSidebar />
 
