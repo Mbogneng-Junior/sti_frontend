@@ -14,69 +14,44 @@ import {
   Calendar
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { getStudentDashboardStats } from "@/lib/api"; 
-
-// Structure des données de session (adaptée du backend plus tard)
-interface Session {
-  id: string;
-  date: string;
-  time: string;
-  domain: string;
-  caseTitle: string;
-  messageCount: number;
-  isCompleted: boolean;
-  score: number | null;
-}
-
-// Données simulées temporaires (pour affichage initial)
-const MOCK_SESSIONS: Session[] = [
-  {
-    id: "SESSION-1",
-    date: "24 Jan 2026",
-    time: "14:30",
-    domain: "Paludisme",
-    caseTitle: "Cas de Paludisme Simple",
-    messageCount: 12,
-    isCompleted: false,
-    score: null
-  },
-  {
-    id: "SESSION-2",
-    date: "21 Jan 2026",
-    time: "09:15",
-    domain: "Paludisme",
-    caseTitle: "Cas de Paludisme Sévère",
-    messageCount: 24,
-    isCompleted: true,
-    score: 85
-  }
-];
+import { getStudentSessions, type StudentSession } from "@/lib/api"; 
 
 export default function ChatListPage() {
   const router = useRouter();
   const { user, isLoading: isAuthLoading } = useAuth();
-  const [sessions, setSessions] = useState<Session[]>(MOCK_SESSIONS);
-  const [isLoading, setIsLoading] = useState(false);
+  const [sessions, setSessions] = useState<StudentSession[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Plus tard: fetch from backend
-    // const fetchSessions = async () => { ... }
-  }, []);
+    const loadSessions = async () => {
+        try {
+            const data = await getStudentSessions();
+            setSessions(data);
+        } catch (e) {
+            console.error("Failed to load sessions", e);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    if (user) {
+        loadSessions();
+    } else if (!isAuthLoading) {
+        setIsLoading(false); // No user, stop loading
+    }
+  }, [user, isAuthLoading]);
 
   const handleResumeSession = (sessionId: string, domain: string) => {
     // Redirection vers la page de leçon existante
-    // Communique avec /learn/[courseId]/lesson/[sessionId]
-    const courseId = domain.toLowerCase(); 
+    const courseId = domain.toLowerCase().replace(/\s+/g, '-'); 
     router.push(`/learn/${courseId}/lesson/${sessionId}`);
   };
 
   const handleStartNewSession = () => {
-    const newSessionId = `SESSION-${Date.now()}`;
-    // Par défaut on lance un cas de paludisme pour l'instant
-    router.push(`/learn/paludisme/lesson/${newSessionId}`);
+    router.push(`/learn/new`);
   };
 
-  if (isAuthLoading) {
+  if (isAuthLoading || isLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-gray-50">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -100,52 +75,74 @@ export default function ChatListPage() {
           </Button>
         </div>
 
-        <div className="grid gap-4">
-          {sessions.map((session) => (
-            <Card key={session.id} className="hover:shadow-md transition-shadow cursor-pointer group" onClick={() => handleResumeSession(session.id, session.domain)}>
-              <CardContent className="p-6 flex items-center justify-between">
-                <div className="flex items-start gap-4">
-                  <div className={`p-3 rounded-full ${session.isCompleted ? 'bg-green-100' : 'bg-blue-100'}`}>
-                    <MessageSquare className={`h-6 w-6 ${session.isCompleted ? 'text-green-600' : 'text-blue-600'}`} />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                      {session.caseTitle}
-                    </h3>
-                    <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" /> {session.time}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" /> {session.date}
-                      </span>
-                      <Badge variant="secondary" className="text-xs font-normal">
-                        {session.domain}
-                      </Badge>
-                    </div>
-                  </div>
+        <div className="space-y-4">
+            {sessions.length === 0 ? (
+                <div className="text-center py-16 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                    <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900">Aucune conversation</h3>
+                    <p className="text-gray-500 mt-1 max-w-sm mx-auto">Commencez une nouvelle consultation pour voir votre historique apparaître ici.</p>
                 </div>
+            ) : (
+                sessions.map((session) => (
+                    <Card key={session.id} className="hover:shadow-md transition-shadow border-gray-100 overflow-hidden group">
+                    <CardContent className="p-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center">
+                        <div className="p-6 flex-1 space-y-4 sm:space-y-0 sm:flex sm:items-center sm:gap-6">
+                            <div className="flex-shrink-0">
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                                    session.status === 'Terminée' 
+                                    ? 'bg-green-100 text-green-600' 
+                                    : 'bg-blue-100 text-blue-600'
+                                }`}>
+                                    <MessageSquare className="h-6 w-6" />
+                                </div>
+                            </div>
+                            
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-3 mb-1">
+                                    <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-100">
+                                        {session.domaine}
+                                    </Badge>
+                                    <span className="flex items-center text-xs text-gray-500">
+                                        <Calendar className="h-3 w-3 mr-1" />
+                                        {new Date(session.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                    </span>
+                                </div>
+                                <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                                    {session.cas_titre}
+                                </h3>
+                                <p className="text-sm text-gray-500 mt-0.5 flex items-center gap-4">
+                                    <span className="flex items-center">
+                                        <Clock className="w-3.5 h-3.5 mr-1" />
+                                        {new Date(session.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                    {session.score > 0 && (
+                                        <span className={`font-medium ${session.score >= 50 ? 'text-green-600' : 'text-orange-600'}`}>
+                                            Score: {session.score}%
+                                        </span>
+                                    )}
+                                </p>
+                            </div>
+                        </div>
 
-                <div className="flex items-center gap-6">
-                  <div className="text-right hidden sm:block">
-                    {session.isCompleted ? (
-                      <div>
-                        <span className="text-xs text-gray-500 block uppercase tracking-wider">Score</span>
-                        <span className="font-bold text-lg text-green-600">{session.score}%</span>
-                      </div>
-                    ) : (
-                      <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                        En cours
-                      </span>
-                    )}
-                  </div>
-                  <ArrowRight className="h-5 w-5 text-gray-300 group-hover:text-blue-600 transition-colors" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                        <div className="p-6 pt-0 sm:pt-6 sm:pl-0 sm:border-l border-gray-100 flex items-center">
+                            <Button 
+                                onClick={() => handleResumeSession(session.id, session.domaine)}
+                                variant="ghost" 
+                                className="w-full sm:w-auto text-blue-600 hover:text-blue-700 hover:bg-blue-50 group/btn"
+                            >
+                                {session.status === 'Terminée' ? 'Revoir' : 'Continuer'}
+                                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
+                            </Button>
+                        </div>
+                        </div>
+                    </CardContent>
+                    </Card>
+                ))
+            )}
         </div>
       </div>
     </div>
   );
 }
+

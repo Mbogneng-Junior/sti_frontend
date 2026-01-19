@@ -29,7 +29,7 @@ export function SummativeModal({ isOpen, onClose, data }: SummativeModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden bg-white dark:bg-slate-950">
         
         {/* Header */}
         <DialogHeader className="p-6 pb-2 bg-indigo-50 dark:bg-indigo-950/30">
@@ -87,13 +87,13 @@ export function SummativeModal({ isOpen, onClose, data }: SummativeModalProps) {
                             <CheckCircle2 className="w-4 h-4" /> Points Forts
                         </h3>
                         <ul className="space-y-2">
-                            {data.points_forts.map((pt, i) => (
+                            {(data.points_forts || []).map((pt, i) => (
                                 <li key={i} className="text-sm text-slate-700 dark:text-slate-300 flex items-start gap-2">
                                     <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
                                     {pt}
                                 </li>
                             ))}
-                            {data.points_forts.length === 0 && <li className="text-xs text-slate-400 italic">Aucun point fort spécifique détecté.</li>}
+                            {(data.points_forts || []).length === 0 && <li className="text-xs text-slate-400 italic">Aucun point fort spécifique détecté.</li>}
                         </ul>
                     </div>
 
@@ -103,13 +103,13 @@ export function SummativeModal({ isOpen, onClose, data }: SummativeModalProps) {
                             <AlertTriangle className="w-4 h-4" /> Axes d'amélioration
                         </h3>
                         <ul className="space-y-2">
-                            {data.difficultes_identifiees.map((pt, i) => (
+                            {(data.difficultes_identifiees || []).map((pt, i) => (
                                 <li key={i} className="text-sm text-slate-700 dark:text-slate-300 flex items-start gap-2">
                                     <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
                                     {pt}
                                 </li>
                             ))}
-                            {data.difficultes_identifiees.length === 0 && <li className="text-xs text-slate-400 italic">Aucune difficulté majeure identifiée. Bravo !</li>}
+                            {(data.difficultes_identifiees || []).length === 0 && <li className="text-xs text-slate-400 italic">Aucune difficulté majeure identifiée. Bravo !</li>}
                         </ul>
                     </div>
                 </div>

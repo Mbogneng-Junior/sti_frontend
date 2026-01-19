@@ -128,7 +128,12 @@ export default function ProfilePage() {
                             profil.lacunes_identifiees.map((lacune, idx) => (
                                 <li key={idx} className="flex gap-2 text-sm text-gray-700 bg-red-50 p-2 rounded-md">
                                     <span className="text-red-500 font-bold">•</span>
-                                    {lacune}
+                                    {typeof lacune === 'string' ? lacune : (
+                                        <span className="flex flex-col">
+                                            <span className="font-semibold text-xs text-red-700 uppercase">{lacune.competence}</span>
+                                            <span>{lacune.feedback}</span>
+                                        </span>
+                                    )}
                                 </li>
                             ))
                         ) : (

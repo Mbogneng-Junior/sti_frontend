@@ -1,7 +1,8 @@
 // lib/api.ts
 // Connexion au backend FastAPI pour les cas cliniques
 
-const API_BASE_URL = "http://localhost:8000";
+// Utilisation de 127.0.0.1 pour éviter les problèmes de résolution IPv6/IPv4 sur localhost
+const API_BASE_URL = "http://127.0.0.1:8000";
 
 /**
  * Gets authorization headers with token if available
@@ -42,6 +43,7 @@ export interface StudentStats {
 export interface StudentDashboardData {
   global_stats: StudentStats;
   proficiency_data: ProficiencyItem[];
+  difficulties: string[];
 }
 
 export const getStudentDashboardStats = async (): Promise<StudentDashboardData> => {
@@ -51,6 +53,24 @@ export const getStudentDashboardStats = async (): Promise<StudentDashboardData> 
   if (!res.ok) throw new Error("Erreur chargement dashboard");
   return res.json();
 };
+
+export interface StudentSession {
+    id: string;
+    cas_titre: string;
+    domaine: string;
+    date: string;
+    score: number;
+    status: string;
+}
+
+export const getStudentSessions = async (): Promise<StudentSession[]> => {
+    const res = await fetch(`${API_BASE_URL}/api/v1/apprenant/dashboard/sessions/`, {
+        headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error("Erreur chargement des sessions");
+    return res.json();
+};
+
 
 export interface Badge {
   id: number;
@@ -79,7 +99,7 @@ export interface FullProfileData {
   };
   profil: {
     xp_total: number;
-    lacunes_identifiees: string[];
+    lacunes_identifiees: (string | { domaine: string; feedback: string; competence: string })[];
     badges: Badge[];
     est_profile: boolean;
   };
@@ -217,6 +237,7 @@ type BackendClinicalCase = {
     niveau_difficulte: string | null;
     pathologie_principale: string | null;
     specialite_medicale: string | null;
+    domaine_nom?: string; // Ajouté via serializer
     objectifs_pedagogiques: string[];
     motif_consultation: string;
     donnees_patient: BackendDonneesPersonnelles;
@@ -406,7 +427,7 @@ const mapCaseToExpertData = (backendCase: BackendClinicalCase): ExpertCaseData =
         id: backendCase.id_unique,
         patientAge: backendCase.donnees_patient.age,
         gender: mapGender(backendCase.donnees_patient.sexe),
-        domain: backendCase.pathologie_principale || "Non défini",
+        domain: backendCase.domaine_nom || backendCase.specialite_medicale || "Non défini",
         extractionDate: backendCase.date_creation || new Date().toISOString(),
         status: mapStatus(backendCase.statut),
         difficulty: mapDifficulty(backendCase.niveau_difficulte),
@@ -851,8 +872,11 @@ export const updateExpertProfile = async (data: any) => {
 
 export const getDomaines = async () => {
     try {
+        // Endpoint public : pas de token nécessaire pour éviter les 401 si token invalide stocké
         const response = await fetch(`${API_BASE_URL}/api/v1/expert/domaines/`, {
-            headers: getAuthHeaders()
+            headers: {
+                "Content-Type": "application/json"
+            }
         });
         const data = await handleApiResponse(response);
         // L'API DRF retourne soit une liste directe, soit un objet paginé { results: [...] }

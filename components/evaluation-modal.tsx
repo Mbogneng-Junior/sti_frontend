@@ -42,8 +42,8 @@ export function EvaluationModal({ isOpen, onClose, data }: EvaluationModalProps)
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleNext()}>
-      <DialogContent className="sm:max-w-xl">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-xl bg-white dark:bg-slate-950 max-h-[85vh] overflow-y-auto block">
+        <DialogHeader className="mb-4">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-full shrink-0">
                 <BrainCircuit className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
