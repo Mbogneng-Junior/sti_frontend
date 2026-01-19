@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/useAuth"; 
 import {
   Select,
   SelectContent,
@@ -27,17 +28,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import * as api from "@/lib/api";
 
-// Liste des specialites medicales (basee sur pathologies_knowledge.json)
-const specialites = [
-  { value: "medecine-generale", label: "Medecine Generale" },
-  { value: "urgences", label: "Urgences" },
-  { value: "medecine-interne", label: "Medecine Interne" },
-  { value: "pneumologie", label: "Pneumologie" },
-  { value: "cardiologie", label: "Cardiologie" },
-  { value: "endocrinologie", label: "Endocrinologie" },
-  { value: "urologie", label: "Urologie" },
-];
+interface Domaine {
+  id: string;
+  nom: string;
+}
+
 
 interface FormData {
   nom: string;
@@ -47,6 +44,7 @@ interface FormData {
   confirmPassword: string;
   specialite: string;
   telephone: string;
+  matricule: string;
 }
 
 interface FormErrors {
@@ -56,6 +54,7 @@ interface FormErrors {
   password?: string;
   confirmPassword?: string;
   specialite?: string;
+  matricule?: string;
 }
 
 export default function AddExpertPage() {
@@ -63,6 +62,32 @@ export default function AddExpertPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [domaines, setDomaines] = useState<Domaine[]>([]);
+  const { register } = useAuth(); // Utiliser le hook useAuth
+
+  useEffect(() => {
+    const fetchDomaines = async () => {
+      try {
+        const domainesData = await api.getDomaines();
+        setDomaines(domainesData);
+      } catch (error) {
+        toast.error("Erreur lors de la récupération des spécialités");
+      }
+    };
+    fetchDomaines();
+  }, []);
+
+  useEffect(() => {
+    const fetchDomaines = async () => {
+      try {
+        const domainesData = await api.getDomaines();
+        setDomaines(domainesData);
+      } catch (error) {
+        toast.error("Erreur lors de la récupération des spécialités");
+      }
+    };
+    fetchDomaines();
+  }, []);
 
   const [formData, setFormData] = useState<FormData>({
     nom: "",
@@ -72,6 +97,7 @@ export default function AddExpertPage() {
     confirmPassword: "",
     specialite: "",
     telephone: "",
+    matricule: "",
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
@@ -92,6 +118,10 @@ export default function AddExpertPage() {
       newErrors.email = "L'email est requis";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "Format d'email invalide";
+    }
+
+    if (!formData.matricule.trim()) {
+      newErrors.matricule = "Le matricule est requis";
     }
 
     if (!formData.password) {
@@ -124,22 +154,17 @@ export default function AddExpertPage() {
     setIsLoading(true);
 
     try {
-      // TODO: Remplacer par l'appel API reel
-      // await api.createExpert({
-      //   nom: formData.nom,
-      //   prenom: formData.prenom,
-      //   email: formData.email,
-      //   password: formData.password,
-      //   specialite: formData.specialite,
-      //   telephone: formData.telephone,
-      // });
-
-      // Simulation d'un delai d'API
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await register({
+        nom: `${formData.prenom} ${formData.nom}`, // Concaténer nom et prénom pour le champ nom
+        email: formData.email,
+        password: formData.password,
+        matricule: formData.matricule,
+        domaine_expertise_id: formData.specialite, // 'specialite' contient maintenant l'ID du domaine
+      }, 'expert');
 
       toast.success("Expert ajoute avec succes!", {
         description: `${formData.prenom} ${formData.nom} a ete ajoute en tant qu'expert en ${
-          specialites.find((s) => s.value === formData.specialite)?.label
+          domaines.find((d) => d.id === formData.specialite)?.nom
         }`,
       });
 
@@ -262,28 +287,47 @@ export default function AddExpertPage() {
                 onChange={(e) => handleChange("email", e.target.value)}
                 className={errors.email ? "border-red-300 focus:ring-red-500/20" : ""}
               />
-              {errors.email && (
-                <p className="text-sm text-red-500 flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  {errors.email}
-                </p>
-              )}
-            </div>
-
-            {/* Telephone (optionnel) */}
-            <div className="space-y-2">
-              <Label htmlFor="telephone" className="flex items-center gap-2">
-                Telephone (optionnel)
-              </Label>
-              <Input
-                id="telephone"
-                type="tel"
-                placeholder="Ex: +237 6XX XXX XXX"
-                value={formData.telephone}
-                onChange={(e) => handleChange("telephone", e.target.value)}
-              />
-            </div>
-
+                            {errors.email && (
+                              <p className="text-sm text-red-500 flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" />
+                                {errors.email}
+                              </p>
+                            )}
+                          </div>
+              
+                          {/* Matricule */}
+                          <div className="space-y-2">
+                            <Label htmlFor="matricule" className="flex items-center gap-2">
+                              Matricule <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                              id="matricule"
+                              placeholder="Ex: 12345-EX"
+                              value={formData.matricule}
+                              onChange={(e) => handleChange("matricule", e.target.value)}
+                              className={errors.matricule ? "border-red-300 focus:ring-red-500/20" : ""}
+                            />
+                            {errors.matricule && (
+                              <p className="text-sm text-red-500 flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" />
+                                {errors.matricule}
+                              </p>
+                            )}
+                          </div>
+              
+                          {/* Telephone (optionnel) */}
+                          <div className="space-y-2">
+                            <Label htmlFor="telephone" className="flex items-center gap-2">
+                              Telephone (optionnel)
+                            </Label>
+                            <Input
+                              id="telephone"
+                              type="tel"
+                              placeholder="Ex: +237 6XX XXX XXX"
+                              value={formData.telephone}
+                              onChange={(e) => handleChange("telephone", e.target.value)}
+                            />
+                          </div>
             {/* Specialite */}
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
@@ -298,9 +342,9 @@ export default function AddExpertPage() {
                   <SelectValue placeholder="Selectionnez une specialite" />
                 </SelectTrigger>
                 <SelectContent>
-                  {specialites.map((spec) => (
-                    <SelectItem key={spec.value} value={spec.value}>
-                      {spec.label}
+                  {domaines.map((domaine) => (
+                    <SelectItem key={domaine.id} value={domaine.id}>
+                      {domaine.nom}
                     </SelectItem>
                   ))}
                 </SelectContent>
