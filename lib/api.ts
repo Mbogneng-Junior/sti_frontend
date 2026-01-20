@@ -23,6 +23,18 @@ const getAuthHeaders = (): HeadersInit => {
     return headers;
 };
 
+/**
+ * Récupère la liste de tous les experts enregistrés
+ */
+export const getExperts = async (): Promise<any[]> => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/expert/experts/`, {
+        headers: getAuthHeaders()
+    });
+    const data = await handleApiResponse(response);
+    // DRF peut renvoyer une liste directe ou un objet paginé { results: [] }
+    return Array.isArray(data) ? data : (data.results || []);
+};
+
 // --- Student Dashboard Types ---
 export interface ProficiencyItem {
   id: string;
